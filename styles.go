@@ -67,4 +67,10 @@ var (
 			Background(colorUser).
 			Bold(true).
 			Padding(0, 1)
+
+	styleModeWorkspaces = lipgloss.NewStyle().
+				Foreground(colorBg).
+				Background(colorAccent).
+				Bold(true).
+				Padding(0, 1)
 )

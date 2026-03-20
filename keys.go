@@ -8,6 +8,7 @@ type Mode int
 const (
 	ModeNormal Mode = iota
 	ModeSearch
+	ModeWorkspaces
 )
 
 // KeyMap holds all named key bindings for the application.
@@ -17,6 +18,7 @@ type KeyMap struct {
 	Search key.Binding
 	Back   key.Binding
 	Quit   key.Binding
+	Tab    key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -41,6 +43,10 @@ func DefaultKeyMap() KeyMap {
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
+		),
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "toggle workspaces view"),
 		),
 	}
 }

@@ -29,6 +29,29 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeSearch
 		m.search.Focus()
 		return m, textinput.Blink
+
+	case key.Matches(msg, m.keys.Tab):
+		m.mode = ModeWorkspaces
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		return m, tea.Quit
+
+	case key.Matches(msg, m.keys.Up):
+		m.workspaceCursor = clamp(m.workspaceCursor-1, 0, len(m.workspaces)-1)
+
+	case key.Matches(msg, m.keys.Down):
+		m.workspaceCursor = clamp(m.workspaceCursor+1, 0, len(m.workspaces)-1)
+
+	case key.Matches(msg, m.keys.Tab):
+		m.mode = ModeNormal
+		return m, nil
 	}
 
 	return m, nil

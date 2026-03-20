@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -36,6 +37,8 @@ type model struct {
 	err              error
 	messages         []Message // messages for currently selected session; nil = loading
 	previewSessionID string    // session ID whose messages are loaded
+	workspaces       []string  // sorted unique workspace directories
+	workspaceCursor  int       // cursor into workspaces slice
 }
 
 func newModel(dbPath string) model {
@@ -86,7 +89,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionsLoadedMsg:
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
+		m.workspaces = buildWorkspaces(m.sessions)
 		m.cursor = 0
+		m.workspaceCursor = 0
 		if len(m.filtered) > 0 {
 			id := m.filtered[0].ID
 			m.previewSessionID = id
@@ -113,6 +118,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateNormal(msg)
 		case ModeSearch:
 			return m.updateSearch(msg)
+		case ModeWorkspaces:
+			return m.updateWorkspaces(msg)
 		}
 	}
 	return m, nil
@@ -132,6 +139,21 @@ func filterSessions(sessions []Session, query string) []Session {
 		}
 	}
 	return out
+}
+
+// buildWorkspaces returns a sorted, deduplicated list of directories from
+// the given sessions. Called once when sessions are loaded.
+func buildWorkspaces(sessions []Session) []string {
+	seen := make(map[string]struct{}, len(sessions))
+	for _, s := range sessions {
+		seen[s.Directory] = struct{}{}
+	}
+	ws := make([]string, 0, len(seen))
+	for dir := range seen {
+		ws = append(ws, dir)
+	}
+	sort.Strings(ws)
+	return ws
 }
 
 // clamp constrains v to [lo, hi].

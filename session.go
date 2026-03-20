@@ -29,8 +29,13 @@ func (s Session) FilterValue() string {
 
 // DisplayDirectory replaces the home directory with ~ for display.
 func (s Session) DisplayDirectory() string {
+	return displayDir(s.Directory)
+}
+
+// displayDir replaces the home directory prefix with "~" in the given path.
+func displayDir(dir string) string {
 	home, _ := os.UserHomeDir()
-	return strings.Replace(s.Directory, home, "~", 1)
+	return strings.Replace(dir, home, "~", 1)
 }
 
 // ShortDirectory returns just the last path component (project folder name).

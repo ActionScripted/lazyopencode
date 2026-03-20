@@ -16,6 +16,10 @@ func (m model) View() string {
 		h = 24
 	}
 
+	if m.mode == ModeWorkspaces {
+		return m.renderWorkspacesView(w, h)
+	}
+
 	previewW := w * 45 / 100
 	if previewW < 30 {
 		previewW = 30
@@ -173,8 +177,10 @@ func (m model) renderHint(width int) string {
 	switch m.mode {
 	case ModeSearch:
 		hints = "  enter/esc: back   type to filter"
+	case ModeWorkspaces:
+		hints = "  j/k: navigate   tab: sessions view   q: quit"
 	default:
-		hints = "  j/k: navigate   /: search   q: quit"
+		hints = "  j/k: navigate   /: search   tab: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -182,6 +188,8 @@ func (m model) renderHint(width int) string {
 	switch m.mode {
 	case ModeSearch:
 		badge = styleModeSearch.Render("SEARCH")
+	case ModeWorkspaces:
+		badge = styleModeWorkspaces.Render("WORKSPACES")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
 	}
@@ -288,4 +296,161 @@ func truncate(s string, maxW int) string {
 		used += rw
 	}
 	return string(out) + "…"
+}
+
+// ── Workspaces view ───────────────────────────────────────────────────────────
+
+// renderWorkspacesView is the top-level render for ModeWorkspaces.
+// Left pane: navigable list of unique workspace directories.
+// Right pane: read-only list of sessions belonging to the selected workspace.
+func (m model) renderWorkspacesView(w, h int) string {
+	// hint bar: 2 rows (border + text); pane body gets the rest.
+	bodyH := h - 2
+
+	rightW := w * 55 / 100
+	if rightW < 30 {
+		rightW = 30
+	}
+	leftW := w - rightW
+
+	left := m.renderWorkspaceList(leftW, bodyH)
+	right := m.renderWorkspaceSessions(rightW, bodyH)
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	hint := m.renderHint(w)
+
+	return body + "\n" + hint
+}
+
+// renderWorkspaceList renders the left pane: a scrollable list of workspace
+// directories, with the selected row highlighted.
+func (m model) renderWorkspaceList(width, height int) string {
+	var sb strings.Builder
+
+	// Header separator (mirrors the search bar separator in the sessions view).
+	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width-1)) + "\n")
+	height-- // consumed by separator
+
+	if len(m.workspaces) == 0 {
+		sb.WriteString(styleDim.Render("  no workspaces") + "\n")
+		return sb.String()
+	}
+
+	visibleStart := 0
+	if m.workspaceCursor >= height {
+		visibleStart = m.workspaceCursor - height + 1
+	}
+
+	for i := visibleStart; i < len(m.workspaces) && i < visibleStart+height; i++ {
+		ws := m.workspaces[i]
+		selected := i == m.workspaceCursor
+		sb.WriteString(formatWorkspaceRow(ws, width, selected) + "\n")
+	}
+
+	return sb.String()
+}
+
+// formatWorkspaceRow renders a single workspace directory as a fixed-width row.
+// The directory is displayed with "~" substitution and truncated to fit.
+func formatWorkspaceRow(dir string, width int, selected bool) string {
+	const leadSp = 1
+	const trailSp = 1
+
+	// Substitute home directory with "~" for display.
+	display := displayDir(dir)
+
+	innerW := width - leadSp - trailSp
+	if innerW < 1 {
+		innerW = 1
+	}
+	raw := truncate(display, innerW)
+	padded := raw + strings.Repeat(" ", max(0, innerW-lipgloss.Width(raw)))
+
+	base := lipgloss.NewStyle().Foreground(colorAccent)
+	if selected {
+		base = base.Background(colorSelected)
+	}
+
+	lead := base.Copy().Foreground(colorFg).Render(strings.Repeat(" ", leadSp))
+	text := base.Bold(selected).Render(padded)
+	trail := base.Copy().Foreground(colorFg).Render(strings.Repeat(" ", trailSp))
+
+	return lead + text + trail
+}
+
+// renderWorkspaceSessions renders the right pane: a read-only list of sessions
+// for the currently selected workspace.
+func (m model) renderWorkspaceSessions(width, height int) string {
+	inner := width - 4 // account for border + padding
+
+	if len(m.workspaces) == 0 {
+		return stylePreviewPane.Width(width - 2).Height(height).Render(
+			styleDim.Render("no workspaces"),
+		)
+	}
+
+	selectedWS := m.workspaces[m.workspaceCursor]
+
+	// Filter sessions belonging to the selected workspace.
+	var wsSessions []Session
+	for _, s := range m.sessions {
+		if s.Directory == selectedWS {
+			wsSessions = append(wsSessions, s)
+		}
+	}
+
+	// ── header ────────────────────────────────────────────────────────────────
+	var header strings.Builder
+	displayPath := displayDir(selectedWS)
+	header.WriteString(stylePreviewTitle.Render(
+		lipgloss.NewStyle().MaxWidth(inner).Render(displayPath),
+	))
+	header.WriteString("\n")
+	header.WriteString(styleDim.Render(
+		lipgloss.NewStyle().MaxWidth(inner).Render(
+			strings.Repeat("─", max(0, inner)),
+		),
+	))
+
+	// header: path(1) + separator(1) = 2 lines
+	const headerLines = 2
+	listHeight := height - headerLines
+	if listHeight < 1 {
+		listHeight = 1
+	}
+
+	// ── session rows ──────────────────────────────────────────────────────────
+	var sessionRows strings.Builder
+	if len(wsSessions) == 0 {
+		sessionRows.WriteString("\n" + styleDim.Render("  no sessions"))
+	} else {
+		for i, s := range wsSessions {
+			if i >= listHeight {
+				break
+			}
+			sessionRows.WriteString("\n" + formatWorkspaceSessionRow(s, inner))
+		}
+	}
+
+	return stylePreviewPane.Width(width - 2).Height(height).Render(
+		header.String() + sessionRows.String(),
+	)
+}
+
+// formatWorkspaceSessionRow renders a compact session row for the workspaces
+// right pane. Layout: date(16) "  " title(remaining). No path column needed
+// since all sessions share the same workspace.
+func formatWorkspaceSessionRow(s Session, width int) string {
+	const dateW = 16
+	const gap = 2
+	titleW := width - dateW - gap
+	if titleW < 1 {
+		titleW = 1
+	}
+
+	date := styleDim.Render(s.UpdatedAt.Format("2006-01-02 15:04"))
+	title := lipgloss.NewStyle().Foreground(colorTitle).Bold(true).
+		Render(truncate(s.Title, titleW))
+
+	return date + strings.Repeat(" ", gap) + title
 }
