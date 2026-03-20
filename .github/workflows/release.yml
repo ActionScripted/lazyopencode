@@ -75,7 +75,7 @@ jobs:
           echo "SHA_ARM64=$SHA_ARM64" >> "$GITHUB_ENV"
 
       - name: Update tap formula
-        if: ${{ secrets.TAP_GITHUB_TOKEN != '' }}
+        if: ${{ env.GH_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
