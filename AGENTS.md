@@ -108,4 +108,4 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow builds `lazyoc-<os>-<arch>` binaries for `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`.
+The release workflow builds `lazyopencode-<os>-<arch>` binaries for `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`.

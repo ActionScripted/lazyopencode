@@ -44,13 +44,13 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
-        run: go build -trimpath -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o lazyoc-${{ matrix.goos }}-${{ matrix.goarch }} .
+        run: go build -trimpath -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o lazyopencode-${{ matrix.goos }}-${{ matrix.goarch }} .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lazyoc-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: lazyoc-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: lazyopencode-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: lazyopencode-${{ matrix.goos }}-${{ matrix.goarch }}
 
   publish:
     name: Publish GitHub Release
@@ -66,4 +66,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: lazyoc-*
+          files: lazyopencode-*

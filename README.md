@@ -5,9 +5,38 @@ lazygit for opencode — browse, search, and preview opencode sessions; group by
 ## Requirements
 
 - [opencode](https://opencode.ai)
-- [Go](https://golang.org/dl/) 1.25+
 
 ## Install
+
+### Download a binary
+
+Download the binary for your platform from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest):
+
+| Platform | Binary |
+|----------|--------|
+| macOS (Apple Silicon) | `lazyopencode-darwin-arm64` |
+| macOS (Intel) | `lazyopencode-darwin-amd64` |
+| Linux (x86_64) | `lazyopencode-linux-amd64` |
+| Linux (ARM64) | `lazyopencode-linux-arm64` |
+
+Then make it executable and move it onto your `$PATH`:
+
+```sh
+chmod +x lazyopencode-<os>-<arch>
+mv lazyopencode-<os>-<arch> ~/.local/bin/lazyopencode
+```
+
+### go install
+
+Requires [Go](https://golang.org/dl/) 1.25+.
+
+```sh
+go install github.com/actionscripted/lazyopencode@latest
+```
+
+### From source
+
+Requires [Go](https://golang.org/dl/) 1.25+.
 
 ```sh
 make install
