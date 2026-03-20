@@ -65,3 +65,18 @@ make vet     # run go vet
 make lint    # run golangci-lint
 make test    # run go test ./...
 ```
+
+## Releases
+
+Releases are cut by pushing a semver tag. The GitHub Actions release workflow
+builds binaries for all supported platforms and publishes them to GitHub
+Releases with auto-generated release notes.
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Supported platforms: `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`.
+
+CI runs on every push to `main` and on all pull requests (`vet` + `lint` + `test`).
