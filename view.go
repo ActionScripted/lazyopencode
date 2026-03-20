@@ -36,7 +36,7 @@ func (m model) View() string {
 
 	// hint bar occupies 2 rows (border + text)
 	// search + separator occupy 2 rows
-	list := m.renderList(listW, h-4)
+	list := styleListPane.Width(listW).Height(h - 2).Render(m.renderList(listW, h-4))
 	preview := m.renderPreview(previewW, h-2)
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
@@ -360,7 +360,7 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	// reset. By giving every span its own background we guarantee the highlight
 	// is unbroken across the full row width regardless of what other attributes
 	// (bold, color) individual cells carry.
-	base := lipgloss.NewStyle().Foreground(colorFg)
+	base := lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
 	if selected {
 		base = base.Background(colorSelected)
 	}
@@ -499,7 +499,7 @@ func (m model) renderWorkspacesView(w, h int) string {
 	}
 	leftW := w - rightW
 
-	left := m.renderWorkspaceList(leftW, bodyH)
+	left := styleListPane.Width(leftW).Height(bodyH).Render(m.renderWorkspaceList(leftW, bodyH))
 	right := m.renderWorkspaceSessions(rightW, bodyH)
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
@@ -552,7 +552,7 @@ func formatWorkspaceRow(dir string, width int, selected bool) string {
 	raw := truncate(display, innerW)
 	padded := raw + strings.Repeat(" ", max(0, innerW-lipgloss.Width(raw)))
 
-	base := lipgloss.NewStyle().Foreground(colorAccent)
+	base := lipgloss.NewStyle().Foreground(colorAccent).Background(colorBgPanel)
 	if selected {
 		base = base.Background(colorSelected)
 	}

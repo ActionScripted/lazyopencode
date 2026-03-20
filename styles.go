@@ -10,6 +10,8 @@ var (
 	colorAccent    = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
 	colorBlue      = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
 	colorBg        = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
+	colorBgPanel   = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
+	colorBgElement = lipgloss.AdaptiveColor{Light: "#c8c9ce", Dark: "#222436"} // opencode backgroundElement — inputs, interactive elements
 	colorSelected  = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
 	colorBorder    = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
 	colorUser      = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
@@ -27,6 +29,9 @@ var (
 
 	styleSeparator = lipgloss.NewStyle().
 			Foreground(colorBorder)
+
+	styleListPane = lipgloss.NewStyle().
+			Background(colorBgPanel)
 
 	// Preview
 	stylePreviewPane = lipgloss.NewStyle().
