@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,7 +20,12 @@ func main() {
 		fmt.Fprintf(w, "Usage: lazyopencode [flags]\n\n")                                //nolint:errcheck
 		fmt.Fprintf(w, "A terminal UI for browsing and managing opencode sessions.\n\n") //nolint:errcheck
 		fmt.Fprintf(w, "Flags:\n")                                                       //nolint:errcheck
-		flag.PrintDefaults()
+		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+		fmt.Fprintf(tw, "  --help\tshow this help message\n") //nolint:errcheck
+		flag.VisitAll(func(f *flag.Flag) {                    //nolint:errcheck
+			fmt.Fprintf(tw, "  --%s\t%s\n", f.Name, f.Usage) //nolint:errcheck
+		})
+		tw.Flush() //nolint:errcheck
 	}
 
 	flag.Parse()
