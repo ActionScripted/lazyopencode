@@ -283,7 +283,7 @@ func (m model) renderHint(width int) string {
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		hints = "  Y/d: confirm delete   n/esc: cancel"
 	default:
-		hints = "  j/k: navigate   /: search   dd: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   dd: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 

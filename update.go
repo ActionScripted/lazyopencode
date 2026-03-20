@@ -43,6 +43,13 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingDeleteID = m.filtered[m.cursor].ID
 		m.mode = ModeConfirmDelete
 		return m, nil
+
+	case key.Matches(msg, m.keys.Open):
+		if len(m.filtered) == 0 {
+			return m, nil
+		}
+		s := m.filtered[m.cursor]
+		return m, m.openSessionCmd(s.ID, s.Directory)
 	}
 
 	return m, nil

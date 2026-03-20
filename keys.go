@@ -22,6 +22,7 @@ type KeyMap struct {
 	Quit       key.Binding
 	Workspaces key.Binding
 	Delete     key.Binding
+	Open       key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -40,8 +41,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("/", "search"),
 		),
 		Back: key.NewBinding(
-			key.WithKeys("esc", "enter"),
-			key.WithHelp("esc/enter", "back"),
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "back"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
@@ -54,6 +55,10 @@ func DefaultKeyMap() KeyMap {
 		Delete: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "delete"),
+		),
+		Open: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "open"),
 		),
 	}
 }

@@ -29,6 +29,9 @@ type statsLoadedMsg struct {
 // sessionDeletedMsg signals that a session was successfully deleted.
 type sessionDeletedMsg struct{}
 
+// sessionOpenedMsg signals that an opencode session subprocess has exited.
+type sessionOpenedMsg struct{}
+
 // errMsg carries a non-fatal error to display in the UI.
 type errMsg struct {
 	err error
@@ -103,6 +106,16 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 	}
 }
 
+// openSessionCmd suspends lazyoc, hands the terminal to opencode running in
+// the session's directory, then resumes and reloads sessions when it exits.
+func (m model) openSessionCmd(id, dir string) tea.Cmd {
+	c := exec.Command("opencode", "--session", id)
+	c.Dir = dir
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return sessionOpenedMsg{}
+	})
+}
+
 func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 	return func() tea.Msg {
 		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
@@ -167,6 +180,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionDeletedMsg:
 		// Optimistic removal already applied at confirm time; nothing to reload.
 		return m, nil
+
+	case sessionOpenedMsg:
+		// Reload sessions to pick up any changes made during the opencode session.
+		return m, m.loadSessionsCmd()
 
 	case errMsg:
 		m.err = msg.err
