@@ -64,8 +64,22 @@ func (m model) renderList(width, height int) string {
 		visibleStart = m.cursor - height + 1
 	}
 
+	// Compute the path column width from the visible session set so the column
+	// stays as tight as possible and reflows correctly when the search filter
+	// changes.
+	const maxPathW = 30
+	pathColW := 0
+	for _, s := range m.filtered {
+		if n := lipgloss.Width(s.ShortDirectory()); n > pathColW {
+			pathColW = n
+		}
+	}
+	if pathColW > maxPathW {
+		pathColW = maxPathW
+	}
+
 	for i := visibleStart; i < len(m.filtered) && i < visibleStart+height; i++ {
-		row := formatRow(m.filtered[i], width)
+		row := formatRow(m.filtered[i], width, pathColW)
 		pad := width - lipgloss.Width(row)
 		if pad < 0 {
 			pad = 0
@@ -191,21 +205,75 @@ func (m model) renderHint(width int) string {
 }
 
 // formatRow renders a single session as a fixed-layout row.
-// Layout: " " date " " title " " dir " "
-// Columns: date=16, dir=20, title=whatever remains. No Bold, no Width() calls.
-func formatRow(s Session, width int) string {
-	const dateW = 16 // "2006-01-02 15:04"
-	const dirW = 20
-	const spacing = 4 // 1 leading + 3 separators between columns
+//
+// Layout (all widths in terminal columns):
+//
+//	" " date(16) "  " title(titleW) "  " path(pathColW) " "
+//
+// pathColW is computed by the caller from the live session list so the column
+// is always as tight as possible and reflows when the search filter changes.
+//
+// All width arithmetic is performed on plain text before any style is applied.
+// That means adding bold or color to any cell later requires only wrapping the
+// already-padded plain string — the numbers never need to change.
+func formatRow(s Session, width, pathColW int) string {
+	const (
+		leadSp  = 1  // single leading space
+		dateW   = 16 // "2006-01-02 15:04" is always exactly 16 columns
+		dateGap = 2  // spaces between date and title
+		minGap  = 2  // minimum spaces between title and path
+		trailSp = 1  // single trailing space
+	)
 
-	titleW := width - dateW - dirW - spacing
+	titleW := width - leadSp - dateW - dateGap - minGap - pathColW - trailSp
 	if titleW < 1 {
 		titleW = 1
 	}
 
-	date := s.UpdatedAt.Format("2006-01-02 15:04")
-	title := lipgloss.NewStyle().MaxWidth(titleW).Render(s.Title)
-	dir := lipgloss.NewStyle().MaxWidth(dirW).Render(s.ShortDirectory())
+	// ── plain-text content, truncated to column widths ────────────────────────
+	date := s.UpdatedAt.Format("2006-01-02 15:04") // always exactly dateW columns
+	rawTitle := truncate(s.Title, titleW)
+	rawPath := truncate(s.ShortDirectory(), pathColW)
 
-	return " " + date + " " + title + " " + dir + " "
+	// ── pad to exact column widths (plain text, no ANSI yet) ──────────────────
+	// Title: left-aligned, space-padded on the right so the path column is pinned.
+	paddedTitle := rawTitle + strings.Repeat(" ", titleW-lipgloss.Width(rawTitle))
+	// Path: right-aligned, space-padded on the left.
+	paddedPath := strings.Repeat(" ", pathColW-lipgloss.Width(rawPath)) + rawPath
+
+	// ── apply styles to already-width-correct plain strings ───────────────────
+	// Only the path gets a color here; the row-level style (normal / selected)
+	// is applied by the caller over the entire row string.
+	coloredPath := styleListPath.Render(paddedPath)
+
+	return " " + date + "  " + paddedTitle + "  " + coloredPath + " "
+}
+
+// truncate clips s to at most maxW terminal columns. If the string is longer
+// it is cut and a single "…" character (1 column) is appended.
+//
+// IMPORTANT: only call this on plain text — never on a string that already
+// contains ANSI escape sequences. Width measurements on pre-styled strings
+// must use lipgloss.Width(), not this function.
+func truncate(s string, maxW int) string {
+	if maxW <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= maxW {
+		return s
+	}
+	// Reserve 1 column for the ellipsis character.
+	var (
+		out  []rune
+		used = 1 // 1 column reserved for "…"
+	)
+	for _, r := range s {
+		rw := lipgloss.Width(string(r))
+		if used+rw > maxW {
+			break
+		}
+		out = append(out, r)
+		used += rw
+	}
+	return string(out) + "…"
 }

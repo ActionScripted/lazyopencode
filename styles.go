@@ -44,6 +44,9 @@ var (
 				Bold(true).
 				Foreground(colorFg)
 
+	styleListPath = lipgloss.NewStyle().
+			Foreground(colorAccent)
+
 	styleRoleUser = lipgloss.NewStyle().
 			Foreground(colorUser).
 			Bold(true)
