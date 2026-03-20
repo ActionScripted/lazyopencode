@@ -16,10 +16,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
           - goos: darwin
             goarch: amd64
           - goos: darwin
@@ -67,3 +63,43 @@ jobs:
         with:
           generate_release_notes: true
           files: lazyopencode-*
+
+      - name: Compute checksums
+        run: |
+          SHA_AMD64=$(sha256sum lazyopencode-darwin-amd64 | awk '{print $1}')
+          SHA_ARM64=$(sha256sum lazyopencode-darwin-arm64 | awk '{print $1}')
+          echo "SHA_AMD64=$SHA_AMD64" >> "$GITHUB_ENV"
+          echo "SHA_ARM64=$SHA_ARM64" >> "$GITHUB_ENV"
+
+      - name: Update tap formula
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # Fetch current formula from tap repo
+          RESPONSE=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/actionscripted/homebrew-lazyopencode/contents/Formula/lazyopencode.rb")
+          FILE_SHA=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
+          CONTENT=$(echo "$RESPONSE" | python3 -c "import sys,json,base64; print(base64.b64decode(json.load(sys.stdin)['content']).decode())")
+
+          # Patch version and sha256 values
+          UPDATED=$(echo "$CONTENT" \
+            | sed "s/version \".*\"/version \"$VERSION_NUM\"/" \
+            | sed "/on_intel/,/end/ s/sha256 \".*\"/sha256 \"$SHA_AMD64\"/" \
+            | sed "/on_arm/,/end/ s/sha256 \".*\"/sha256 \"$SHA_ARM64\"/")
+
+          # Base64-encode the updated content
+          ENCODED=$(echo "$UPDATED" | base64 -w 0)
+
+          # Commit directly to the tap repo via GitHub API
+          curl -s -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/actionscripted/homebrew-lazyopencode/contents/Formula/lazyopencode.rb" \
+            -d "{
+              \"message\": \"chore: update lazyopencode to $VERSION\",
+              \"content\": \"$ENCODED\",
+              \"sha\": \"$FILE_SHA\"
+            }"
