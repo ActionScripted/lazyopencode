@@ -34,27 +34,13 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeWorkspaces
 		return m, nil
 
-	case key.Matches(msg, m.keys.Delete):
+	case msg.String() == "d":
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		id := m.filtered[m.cursor].ID
-
-		// Optimistic removal: strip the session from both slices immediately so
-		// the UI updates on this frame without waiting for the subprocess.
-		m.sessions = removeSessionByID(m.sessions, id)
-		m.filtered = removeSessionByID(m.filtered, id)
-		m.workspaces = buildWorkspaces(m.sessions)
-		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
-
-		var cmd tea.Cmd
-		if len(m.filtered) > 0 {
-			cmd = tea.Batch(m.loadMessagesForCursor(), m.deleteSessionCmd(id))
-		} else {
-			m.messages = nil
-			cmd = m.deleteSessionCmd(id)
-		}
-		return m, cmd
+		m.pendingDeleteID = m.filtered[m.cursor].ID
+		m.mode = ModeConfirmDelete
+		return m, nil
 	}
 
 	return m, nil
@@ -125,4 +111,41 @@ func removeSessionByID(sessions []Session, id string) []Session {
 		}
 	}
 	return out
+}
+
+// updateConfirmDelete handles key events while ModeConfirmDelete is active.
+// Y or d confirms the delete; n, esc, or q cancels.
+func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "d":
+		id := m.pendingDeleteID
+		m.pendingDeleteID = ""
+		m.mode = ModeNormal
+
+		if id == "" {
+			return m, nil
+		}
+
+		// Optimistic removal.
+		m.sessions = removeSessionByID(m.sessions, id)
+		m.filtered = removeSessionByID(m.filtered, id)
+		m.workspaces = buildWorkspaces(m.sessions)
+		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
+
+		var cmd tea.Cmd
+		if len(m.filtered) > 0 {
+			cmd = tea.Batch(m.loadMessagesForCursor(), m.deleteSessionCmd(id))
+		} else {
+			m.messages = nil
+			cmd = m.deleteSessionCmd(id)
+		}
+		return m, cmd
+
+	case "n", "esc", "q", "ctrl+c":
+		m.pendingDeleteID = ""
+		m.mode = ModeNormal
+		return m, nil
+	}
+
+	return m, nil
 }

@@ -43,6 +43,7 @@ type model struct {
 	previewSessionID string    // session ID whose messages are loaded
 	workspaces       []string  // sorted unique workspace directories
 	workspaceCursor  int       // cursor into workspaces slice
+	pendingDeleteID  string    // session ID awaiting delete confirmation
 }
 
 func newModel(dbPath string) model {
@@ -137,6 +138,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSearch(msg)
 		case ModeWorkspaces:
 			return m.updateWorkspaces(msg)
+		case ModeConfirmDelete:
+			return m.updateConfirmDelete(msg)
 		}
 	}
 	return m, nil

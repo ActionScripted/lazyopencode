@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func (m model) View() string {
@@ -34,7 +35,13 @@ func (m model) View() string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	hint := m.renderHint(w)
 
-	return body + "\n" + hint
+	base := body + "\n" + hint
+
+	if m.mode == ModeConfirmDelete {
+		return m.renderWithModal(base, w, h)
+	}
+
+	return base
 }
 
 func (m model) renderList(width, height int) string {
@@ -179,8 +186,10 @@ func (m model) renderHint(width int) string {
 		hints = "  enter/esc: back   type to filter"
 	case ModeWorkspaces:
 		hints = "  j/k: navigate   tab: sessions view   q: quit"
+	case ModeConfirmDelete:
+		hints = "  Y/d: confirm delete   n/esc: cancel"
 	default:
-		hints = "  j/k: navigate   /: search   d: delete   tab: workspaces   q: quit"
+		hints = "  j/k: navigate   /: search   dd: delete   tab: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -190,6 +199,8 @@ func (m model) renderHint(width int) string {
 		badge = styleModeSearch.Render("SEARCH")
 	case ModeWorkspaces:
 		badge = styleModeWorkspaces.Render("WORKSPACES")
+	case ModeConfirmDelete:
+		badge = styleModeConfirmDelete.Render("DELETE?")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
 	}
@@ -296,6 +307,85 @@ func truncate(s string, maxW int) string {
 		used += rw
 	}
 	return string(out) + "…"
+}
+
+// renderWithModal overlays a centered confirmation modal on top of the
+// already-rendered base view. The base is split by newlines; the modal rows
+// are written over the middle lines so the background content is still
+// partially visible around it.
+func (m model) renderWithModal(base string, w, h int) string {
+	// ── build modal content ───────────────────────────────────────────────────
+	title := styleModalTitle.Render("Delete session?")
+
+	// Find the session title for the pending ID.
+	sessionTitle := m.pendingDeleteID
+	for _, s := range m.sessions {
+		if s.ID == m.pendingDeleteID {
+			sessionTitle = s.Title
+			break
+		}
+	}
+
+	// Truncate the session title so it fits inside the modal with padding.
+	const modalInnerW = 46
+	truncatedTitle := truncate(sessionTitle, modalInnerW)
+
+	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
+		styleModalKeyCancel.Render("No [n]")
+
+	modalContent := title + "\n\n" +
+		stylePreviewTitle.Render(truncatedTitle) + "\n\n" +
+		confirm
+
+	rendered := styleModal.Render(modalContent)
+
+	modalW := lipgloss.Width(rendered)
+	modalH := lipgloss.Height(rendered)
+
+	// ── overlay onto base ─────────────────────────────────────────────────────
+	// Split the base into lines, pad each to full width, then overwrite the
+	// center region with the modal lines.
+	baseLines := strings.Split(base, "\n")
+	// Ensure we have enough lines.
+	for len(baseLines) < h {
+		baseLines = append(baseLines, "")
+	}
+
+	startRow := (h - modalH) / 2
+	if startRow < 0 {
+		startRow = 0
+	}
+	startCol := (w - modalW) / 2
+	if startCol < 0 {
+		startCol = 0
+	}
+
+	modalLines := strings.Split(rendered, "\n")
+
+	for i, ml := range modalLines {
+		row := startRow + i
+		if row >= len(baseLines) {
+			break
+		}
+
+		// Pad the base line to full terminal width (plain spaces; ANSI already
+		// in there so we can't use lipgloss.Width reliably — we just ensure
+		// enough trailing spaces).
+		bl := baseLines[row]
+		blW := ansi.StringWidth(bl)
+		if blW < w {
+			bl += strings.Repeat(" ", w-blW)
+			blW = w
+		}
+
+		// Splice: keep startCol columns from the left, then the modal line,
+		// then the remainder — all ANSI-safe via ansi.Cut.
+		left := ansi.Cut(bl, 0, startCol)
+		right := ansi.Cut(bl, startCol+modalW, blW)
+		baseLines[row] = left + ml + right
+	}
+
+	return strings.Join(baseLines, "\n")
 }
 
 // ── Workspaces view ───────────────────────────────────────────────────────────
