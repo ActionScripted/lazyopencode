@@ -4,24 +4,24 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Tokyo Night palette
-	colorFg        = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#a9b1d6"} // editor foreground
-	colorTitle     = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"} // bright white / variable
-	colorDim       = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
-	colorAccent    = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
-	colorBlue      = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
-	colorBg        = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
-	colorBgPanel   = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
-	colorSelected  = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
-	colorBorder    = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
-	colorUser      = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
-	colorAssistant = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
+	colorFg       = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#a9b1d6"} // editor foreground
+	colorBright   = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"} // bright white / variable
+	colorDim      = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
+	colorCyan     = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
+	colorBlue     = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
+	colorBg       = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
+	colorBgPanel  = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
+	colorSelected = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
+	colorBorder   = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
+	colorYellow   = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
+	colorGreen    = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
 
 	// Text
 	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
-	styleAccent = lipgloss.NewStyle().Foreground(colorAccent)
+	styleAccent = lipgloss.NewStyle().Foreground(colorCyan)
 
 	styleSearchPrefix = lipgloss.NewStyle().
-				Foreground(colorAccent).
+				Foreground(colorCyan).
 				Bold(true)
 
 	styleSeparator = lipgloss.NewStyle().
@@ -44,16 +44,16 @@ var (
 				Foreground(colorFg)
 
 	styleRoleUser = lipgloss.NewStyle().
-			Foreground(colorUser).
+			Foreground(colorYellow).
 			Bold(true)
 
 	styleRoleAssistant = lipgloss.NewStyle().
-				Foreground(colorAssistant).
+				Foreground(colorGreen).
 				Bold(true)
 
 	// Diff additions/deletions in the preview header
-	styleAdd = lipgloss.NewStyle().Foreground(colorAssistant) // green
-	styleDel = lipgloss.NewStyle().Foreground(colorDanger)    // red
+	styleAdd = lipgloss.NewStyle().Foreground(colorGreen)  // green
+	styleDel = lipgloss.NewStyle().Foreground(colorDanger) // red
 
 	// Hint bar
 	styleHint = lipgloss.NewStyle().
@@ -61,6 +61,8 @@ var (
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderTop(true).
 			BorderForeground(colorBorder)
+
+	styleHintKey = lipgloss.NewStyle().Foreground(colorBright)
 
 	styleModeNormal = lipgloss.NewStyle().
 			Foreground(colorBg).
@@ -70,19 +72,19 @@ var (
 
 	styleModeSearch = lipgloss.NewStyle().
 			Foreground(colorBg).
-			Background(colorUser).
+			Background(colorYellow).
 			Bold(true).
 			Padding(0, 1)
 
 	styleModeWorkspaces = lipgloss.NewStyle().
 				Foreground(colorBg).
-				Background(colorAccent).
+				Background(colorCyan).
 				Bold(true).
 				Padding(0, 1)
 
 	styleModeYank = lipgloss.NewStyle().
 			Foreground(colorBg).
-			Background(colorAssistant).
+			Background(colorGreen).
 			Bold(true).
 			Padding(0, 1)
 
@@ -96,12 +98,12 @@ var (
 
 	styleModalYank = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorAccent).
+			BorderForeground(colorCyan).
 			Padding(1, 3)
 
 	styleModalGoto = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorUser).
+			BorderForeground(colorYellow).
 			Padding(1, 3)
 
 	styleModalTitle = lipgloss.NewStyle().
@@ -109,11 +111,11 @@ var (
 			Bold(true)
 
 	styleModalYankTitle = lipgloss.NewStyle().
-				Foreground(colorAccent).
+				Foreground(colorCyan).
 				Bold(true)
 
 	styleModalGotoTitle = lipgloss.NewStyle().
-				Foreground(colorUser).
+				Foreground(colorYellow).
 				Bold(true)
 
 	styleModalKey = lipgloss.NewStyle().
@@ -124,13 +126,13 @@ var (
 
 	styleModalKeyYank = lipgloss.NewStyle().
 				Foreground(colorBg).
-				Background(colorAccent).
+				Background(colorCyan).
 				Bold(true).
 				Padding(0, 1)
 
 	styleModalKeyGoto = lipgloss.NewStyle().
 				Foreground(colorBg).
-				Background(colorUser).
+				Background(colorYellow).
 				Bold(true).
 				Padding(0, 1)
 
@@ -148,7 +150,7 @@ var (
 
 	styleModeGoto = lipgloss.NewStyle().
 			Foreground(colorBg).
-			Background(colorUser).
+			Background(colorYellow).
 			Bold(true).
 			Padding(0, 1)
 )

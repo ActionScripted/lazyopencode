@@ -281,8 +281,36 @@ func formatTokens(n int) string {
 	}
 }
 
+// renderHintSegments parses a hint string of the form
+// "  key: desc   key: desc   bare" and returns a styled string where each key
+// is rendered in styleHintKey (white) and each description and separator is
+// rendered in styleDim.
+func renderHintSegments(hints string) string {
+	// Split on three-or-more spaces so multi-word keys/descs are kept intact.
+	segments := strings.Split(hints, "   ")
+	var sb strings.Builder
+	for i, seg := range segments {
+		if i == 0 {
+			// Leading padding / empty prefix — always dim.
+			sb.WriteString(styleDim.Render(seg))
+			continue
+		}
+		sb.WriteString(styleDim.Render("   "))
+		if idx := strings.Index(seg, ": "); idx != -1 {
+			sb.WriteString(styleHintKey.Render(seg[:idx]))
+			sb.WriteString(styleDim.Render(": " + seg[idx+2:]))
+		} else {
+			// No colon — treat as description only (e.g. "type to filter").
+			sb.WriteString(styleDim.Render(seg))
+		}
+	}
+	return sb.String()
+}
+
 func (m model) renderHint(width int) string {
-	appName := styleDim.Render(" Lazy") + styleDim.Bold(true).Render("OpenCode")
+	appName := styleDim.Render(" ") +
+		lipgloss.NewStyle().Foreground(colorBlue).Render("Lazy") +
+		styleHintKey.Bold(true).Render("OpenCode")
 
 	var hints string
 	switch m.mode {
@@ -299,7 +327,13 @@ func (m model) renderHint(width int) string {
 	default:
 		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: go to   d: delete   w: toggle workspace   q: quit"
 	}
-	left := appName + styleDim.Render(hints)
+	dots := "  " +
+		lipgloss.NewStyle().Foreground(colorBlue).Render("•") +
+		" " +
+		lipgloss.NewStyle().Foreground(colorCyan).Render("•") +
+		" " +
+		lipgloss.NewStyle().Foreground(colorYellow).Render("•")
+	left := appName + dots + renderHintSegments(hints)
 
 	var badge string
 	switch m.mode {
@@ -308,7 +342,7 @@ func (m model) renderHint(width int) string {
 	case ModeWorkspaces:
 		badge = styleModeWorkspaces.Render("WORKSPACES")
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
-		badge = styleModeConfirmDelete.Render("DELETE?")
+		badge = styleModeConfirmDelete.Render("DELETE")
 	case ModeYank:
 		badge = styleModeYank.Render("YANK")
 	case ModeGotoMenu:
@@ -401,7 +435,7 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	}
 
 	styledLead := base.Render(strings.Repeat(" ", leadSp))
-	styledTitle := base.Foreground(colorTitle).Bold(true).Render(paddedTitle)
+	styledTitle := base.Foreground(colorBright).Bold(true).Render(paddedTitle)
 	styledTrail := base.Render(strings.Repeat(" ", trailSp) + trailFill)
 
 	row := styledLead
@@ -619,7 +653,7 @@ func formatWorkspaceRow(dir, displayDir string, width int, selected bool) string
 	raw := truncate(displayDir, innerW)
 	padded := raw + strings.Repeat(" ", max(0, innerW-lipgloss.Width(raw)))
 
-	base := lipgloss.NewStyle().Foreground(colorAccent).Background(colorBgPanel)
+	base := lipgloss.NewStyle().Foreground(colorCyan).Background(colorBgPanel)
 	if selected {
 		base = base.Background(colorSelected)
 	}
@@ -701,7 +735,7 @@ func formatWorkspaceSessionRow(s Session, width int) string {
 	}
 
 	date := styleDim.Render(s.UpdatedAt.Format("2006-01-02 15:04"))
-	title := lipgloss.NewStyle().Foreground(colorTitle).Bold(true).
+	title := lipgloss.NewStyle().Foreground(colorBright).Bold(true).
 		Render(truncate(s.Title, titleW))
 
 	return date + strings.Repeat(" ", gap) + title

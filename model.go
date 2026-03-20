@@ -133,6 +133,9 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 // openSessionCmd suspends lazyopencode, hands the terminal to opencode running in
 // the session's directory, then resumes and reloads sessions when it exits.
 func (m model) openSessionCmd(id, dir string) tea.Cmd {
+	if m.demoMode {
+		return nil
+	}
 	c := exec.Command("opencode", "--session", id)
 	c.Dir = dir
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -143,6 +146,9 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 // openShellCmd prints a suspend notice then hands the terminal to $SHELL
 // in the given directory. lazyopencode resumes automatically when the shell exits.
 func (m model) openShellCmd(dir string) tea.Cmd {
+	if m.demoMode {
+		return nil
+	}
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "sh"
@@ -176,6 +182,9 @@ func (m model) yankCmd(text string) tea.Cmd {
 }
 
 func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
+	if m.demoMode {
+		return nil
+	}
 	return func() tea.Msg {
 		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
 			return errMsg{err: err}
@@ -188,6 +197,9 @@ func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 // goroutine and returns one sessionDeletedMsg when all are done, avoiding
 // an N-reload storm on workspace delete.
 func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
+	if m.demoMode {
+		return nil
+	}
 	return func() tea.Msg {
 		for _, id := range ids {
 			if err := exec.Command("opencode", "session", "delete", id).Run(); err != nil {
