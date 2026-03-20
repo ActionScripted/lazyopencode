@@ -10,16 +10,7 @@ lazygit for opencode — browse, search, and preview opencode sessions; group by
 
 ### Download a binary
 
-Download the binary for your platform from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest):
-
-| Platform | Binary |
-|----------|--------|
-| macOS (Apple Silicon) | `lazyopencode-darwin-arm64` |
-| macOS (Intel) | `lazyopencode-darwin-amd64` |
-| Linux (x86_64) | `lazyopencode-linux-amd64` |
-| Linux (ARM64) | `lazyopencode-linux-arm64` |
-
-Then make it executable and move it onto your `$PATH`:
+Download the binary for your platform from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest). Then make it executable and move it onto your `$PATH`:
 
 ```sh
 chmod +x lazyopencode-<os>-<arch>
@@ -52,28 +43,28 @@ lazyopencode
 
 ## Keybinds
 
-| Key | Context | Action |
-|-----|---------|--------|
-| `j` / `↓` | Normal, Workspaces | Move down |
-| `k` / `↑` | Normal, Workspaces | Move up |
-| `enter` | Normal | Open selected session in opencode |
-| `/` | Normal | Search / filter |
-| `w` | Normal | Workspaces view |
-| `y` | Normal | Yank sub-menu |
-| `g` | Normal | Goto sub-menu |
-| `d` | Normal | Delete selected session |
-| `q` / `esc` | Normal | Quit |
-| `esc` | Search | Return to normal mode |
-| `d` | Workspaces | Delete all sessions in selected workspace |
-| `w` / `esc` | Workspaces | Return to normal mode |
-| `d` | Yank | Copy session directory to clipboard |
-| `s` | Yank | Copy session ID to clipboard |
-| `esc` / `q` | Yank | Cancel |
-| `s` | Goto | Open `$SHELL` in the session's directory |
-| `w` | Goto | Jump to that session's workspace |
-| `esc` / `q` | Goto | Cancel |
-| `y` / `d` | Delete confirm | Confirm |
-| `n` / `esc` | Delete confirm | Cancel |
+| Key         | Context            | Action                                    |
+| ----------- | ------------------ | ----------------------------------------- |
+| `j` / `↓`   | Normal, Workspaces | Move down                                 |
+| `k` / `↑`   | Normal, Workspaces | Move up                                   |
+| `enter`     | Normal             | Open selected session in opencode         |
+| `/`         | Normal             | Search / filter                           |
+| `w`         | Normal             | Workspaces view                           |
+| `y`         | Normal             | Yank sub-menu                             |
+| `g`         | Normal             | Goto sub-menu                             |
+| `d`         | Normal             | Delete selected session                   |
+| `q` / `esc` | Normal             | Quit                                      |
+| `esc`       | Search             | Return to normal mode                     |
+| `d`         | Workspaces         | Delete all sessions in selected workspace |
+| `w` / `esc` | Workspaces         | Return to normal mode                     |
+| `d`         | Yank               | Copy session directory to clipboard       |
+| `s`         | Yank               | Copy session ID to clipboard              |
+| `esc` / `q` | Yank               | Cancel                                    |
+| `s`         | Goto               | Open `$SHELL` in the session's directory  |
+| `w`         | Goto               | Jump to that session's workspace          |
+| `esc` / `q` | Goto               | Cancel                                    |
+| `y` / `d`   | Delete confirm     | Confirm                                   |
+| `n` / `esc` | Delete confirm     | Cancel                                    |
 
 ## Development
 
@@ -84,13 +75,13 @@ brew install golangci-lint
 go install golang.org/x/tools/cmd/goimports@latest
 ```
 
-| Command | What it does |
-|---------|-------------|
+| Command      | What it does                                    |
+| ------------ | ----------------------------------------------- |
 | `make check` | fmt + vet + lint + test (run before committing) |
-| `make fmt` | Format with gofmt and goimports |
-| `make vet` | Run go vet |
-| `make lint` | Run golangci-lint |
-| `make test` | Run go test ./... |
+| `make fmt`   | Format with gofmt and goimports                 |
+| `make vet`   | Run go vet                                      |
+| `make lint`  | Run golangci-lint                               |
+| `make test`  | Run go test ./...                               |
 
 ## Releases
 
