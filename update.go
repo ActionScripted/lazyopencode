@@ -54,15 +54,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		dir := m.filtered[m.cursor].Directory
-		for i, ws := range m.workspaces {
-			if ws.Dir == dir {
-				m.workspaceCursor = i
-				break
-			}
-		}
-		m.mode = ModeWorkspaces
-		return m, nil
+		return m, m.openShellCmd(m.filtered[m.cursor].Directory)
 
 	case key.Matches(msg, m.keys.Delete):
 		if len(m.filtered) == 0 {

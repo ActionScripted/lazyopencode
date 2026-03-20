@@ -289,7 +289,7 @@ func (m model) renderHint(width int) string {
 	case ModeYank:
 		hints = "  d: yank directory   s: yank session id   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: workspace   dd: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: shell   dd: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 

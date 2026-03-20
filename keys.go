@@ -89,7 +89,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		GotoWorkspace: key.NewBinding(
 			key.WithKeys("g"),
-			key.WithHelp("g", "go to workspace"),
+			key.WithHelp("g", "open shell"),
 		),
 	}
 }

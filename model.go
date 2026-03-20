@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"sort"
@@ -32,6 +33,9 @@ type sessionDeletedMsg struct{}
 
 // sessionOpenedMsg signals that an opencode session subprocess has exited.
 type sessionOpenedMsg struct{}
+
+// shellExitedMsg signals that a shell subprocess launched via g has exited.
+type shellExitedMsg struct{}
 
 // yankDoneMsg signals that the yank command completed (success or silent failure).
 type yankDoneMsg struct{}
@@ -117,6 +121,20 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 	c.Dir = dir
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return sessionOpenedMsg{}
+	})
+}
+
+// openShellCmd suspends lazyoc and opens $SHELL in the given directory.
+// lazyoc resumes automatically when the shell process exits.
+func (m model) openShellCmd(dir string) tea.Cmd {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "sh"
+	}
+	c := exec.Command(shell)
+	c.Dir = dir
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		return shellExitedMsg{}
 	})
 }
 
@@ -217,6 +235,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionOpenedMsg:
 		// Reload sessions to pick up any changes made during the opencode session.
 		return m, m.loadSessionsCmd()
+
+	case shellExitedMsg:
+		// Shell exited — nothing to reload, just resume.
+		return m, nil
 
 	case yankDoneMsg:
 		// Nothing to do — clipboard write is fire-and-forget.
