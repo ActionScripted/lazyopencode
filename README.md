@@ -6,16 +6,6 @@ lazygit for opencode — browse, search, and preview opencode sessions; group by
 
 - [opencode](https://opencode.ai)
 - [Go](https://golang.org/dl/) 1.25+
-- [golangci-lint](https://golangci-lint.run/usage/install/) — required for `make lint` / `make check`
-- [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports) — required for `make fmt` / `make check`
-
-```sh
-# golangci-lint
-brew install golangci-lint
-
-# goimports
-go install golang.org/x/tools/cmd/goimports@latest
-```
 
 ## Install
 
@@ -58,13 +48,20 @@ lazyopencode
 
 ## Development
 
+Install dev tools:
+
 ```sh
-make check   # fmt + vet + lint + test (run before committing)
-make fmt     # format with gofmt and goimports
-make vet     # run go vet
-make lint    # run golangci-lint
-make test    # run go test ./...
+brew install golangci-lint
+go install golang.org/x/tools/cmd/goimports@latest
 ```
+
+| Command | What it does |
+|---------|-------------|
+| `make check` | fmt + vet + lint + test (run before committing) |
+| `make fmt` | Format with gofmt and goimports |
+| `make vet` | Run go vet |
+| `make lint` | Run golangci-lint |
+| `make test` | Run go test ./... |
 
 ## Releases
 
@@ -80,3 +77,11 @@ git push origin v0.1.0
 Supported platforms: `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`.
 
 CI runs on every push to `main` and on all pull requests (`vet` + `lint` + `test`).
+
+## Contributing
+
+Issues and PRs are welcome. Run `make check` before submitting — it covers formatting, vetting, linting, and tests. No formal contributing process is defined yet.
+
+## License
+
+[MIT](LICENSE)
