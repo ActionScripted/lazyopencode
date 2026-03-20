@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -124,8 +125,8 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 	})
 }
 
-// openShellCmd suspends lazyoc and opens $SHELL in the given directory.
-// lazyoc resumes automatically when the shell process exits.
+// openShellCmd prints a suspend notice then hands the terminal to $SHELL
+// in the given directory. lazyoc resumes automatically when the shell exits.
 func (m model) openShellCmd(dir string) tea.Cmd {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
@@ -133,9 +134,13 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	}
 	c := exec.Command(shell)
 	c.Dir = dir
-	return tea.ExecProcess(c, func(err error) tea.Msg {
+	printCmd := func() tea.Msg {
+		fmt.Fprintf(os.Stdout, "\nopening shell in %s — type 'exit' to return to lazyoc\n\n", displayDir(dir))
+		return nil
+	}
+	return tea.Sequence(printCmd, tea.ExecProcess(c, func(err error) tea.Msg {
 		return shellExitedMsg{}
-	})
+	}))
 }
 
 // yankCmd copies text to the system clipboard using pbcopy (macOS) or

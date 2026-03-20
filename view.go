@@ -182,16 +182,18 @@ func (m model) renderPreview(width, height int) string {
 			header.WriteString("\n")
 		}
 
-		// changes (only when files were modified)
+		// changes
+		header.WriteString(metaLabel("changes"))
 		if s.SummaryFiles > 0 {
-			header.WriteString(metaLabel("changes"))
 			fmt.Fprintf(&header, "%d files (", s.SummaryFiles)
 			header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
 			header.WriteString(" ")
 			header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
 			header.WriteString(")")
-			header.WriteString("\n")
+		} else {
+			header.WriteString(styleDim.Render("none"))
 		}
+		header.WriteString("\n")
 	}
 
 	// separator
@@ -478,8 +480,9 @@ func (m model) renderGotoModal() string {
 	wKey := styleModalKeyGoto.Render("w")
 
 	content := styleModalGotoTitle.Render("Go to…") + "\n\n" +
-		sKey + styleDim.Render("  shell") + "\n" +
-		wKey + styleDim.Render("  workspace view")
+		sKey + "  open shell" + "\n" +
+		styleDim.Render("     type 'exit' to return to lazyoc") + "\n" +
+		wKey + "  workspace view"
 
 	return styleModalGoto.Render(content)
 }
@@ -490,8 +493,8 @@ func (m model) renderYankModal() string {
 	sKey := styleModalKeyYank.Render("s")
 
 	content := styleModalYankTitle.Render("Yank to clipboard") + "\n\n" +
-		dKey + styleDim.Render("  directory") + "\n" +
-		sKey + styleDim.Render("  session id")
+		dKey + "  directory" + "\n" +
+		sKey + "  session id"
 
 	return styleModalYank.Render(content)
 }

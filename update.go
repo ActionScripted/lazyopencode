@@ -124,15 +124,14 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// loadMessagesForCursor returns an updated model with messages and stats
-// cleared, plus a batched command to reload both for the selected session.
+// loadMessagesForCursor returns an updated model with a batched command to
+// reload messages and stats for the selected session. Stale content is kept
+// visible until the new data arrives to prevent layout jumps and flash.
 func (m model) loadMessagesForCursor() (model, tea.Cmd) {
 	if len(m.filtered) == 0 {
 		return m, nil
 	}
 	id := m.filtered[m.cursor].ID
-	m.messages = nil
-	m.stats = nil
 	m.previewSessionID = id
 	return m, tea.Batch(m.loadMessagesCmd(id), m.loadStatsCmd(id))
 }
