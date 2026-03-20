@@ -17,19 +17,20 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 | `main.go` | Entry point; resolves the DB path and starts the Bubble Tea program |
 | `model.go` | App state (`model` struct), `Init`/`Update` logic, session filtering, message types |
 | `view.go` | `View` function and pure render utilities (`formatRow`, `truncate`, etc.) |
-| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`) |
-| `keys.go` | Key bindings and `Mode` enum (`ModeNormal`, `ModeSearch`) |
-| `session.go` | `Session` and `Message` types; display helpers |
-| `db.go` | SQLite queries — `loadSessions` and `loadMessages` |
+| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`, `updateWorkspaces`, `updateConfirmDelete`, `updateConfirmDeleteWorkspace`) |
+| `keys.go` | Key bindings (`KeyMap`) and `Mode` enum |
+| `session.go` | `Session` and `Message` types; `displayDir` and `shortDir` helpers |
+| `db.go` | SQLite queries — `loadSessions` and `loadMessages`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
 | `styles.go` | Lip Gloss style definitions |
 | `Makefile` | `make install` builds and symlinks to `~/.local/bin/lazyoc` |
 
 ## Data flow
 
 1. On startup, `loadSessions` queries `~/.local/share/opencode/opencode.db` (read-only).
-2. Sessions are displayed in a list; filtering happens in-memory via `filterSessions`.
-3. When a session is selected, `loadMessages` fetches its chat history for the preview pane.
-4. Pressing `enter` on a session will launch `opencode --session <id>` in the current directory — **not yet implemented**.
+2. `Session.DisplayDir` and `Session.ShortDir` are computed once at load time in `db.go` — not on every render call.
+3. Sessions are displayed in a list; filtering happens in-memory via `filterSessions`.
+4. When a session is selected, `loadMessages` fetches its chat history for the preview pane.
+5. Pressing `enter` on a session will launch `opencode --session <id>` in the current directory — **not yet implemented**.
 
 ## Architecture
 
@@ -37,15 +38,19 @@ The Bubble Tea Elm pattern is non-negotiable: **all state lives in `model`, all 
 
 New async results use typed message structs (e.g. `type fooLoadedMsg struct { ... }`). All message types live in `model.go`. This keeps the full event surface of the app visible in one place.
 
+All methods on `model` use **value receivers**. Helper functions that need to mutate state return `(model, tea.Cmd)` — never use pointer receivers to smuggle mutations through. `loadMessagesForCursor() (model, tea.Cmd)` is the canonical example.
+
 Styles are declared as package-level `var`s in `styles.go` and nowhere else. This means a theme change is a single-file edit. Don't declare styles inline or inside render functions.
 
 DB functions open their own connection, run their query, and close. SQLite read-only connections are cheap — a shared pool adds complexity with no real benefit here. Don't optimize this.
+
+Session deletion shells out to `opencode session delete <id>` rather than writing directly to the SQLite DB. This is intentional — it keeps lazyoc read-only at the DB layer and delegates mutations to the owning process.
 
 ## Where to make changes
 
 | If you want to… | Touch these files |
 |---|---|
-| Add a key binding | `keys.go` (define), `update.go` (handle) |
+| Add a key binding | `keys.go` (add to `KeyMap` + `DefaultKeyMap`), `update.go` (handle with `key.Matches`) |
 | Add a new style or color | `styles.go` only |
 | Add a DB query | `db.go` only |
 | Add a new message type | `model.go` only |
@@ -56,4 +61,6 @@ DB functions open their own connection, run their query, and close. SQLite read-
 
 - All DB access is read-only (`?mode=ro`). A missing DB is treated as an empty state, not an error.
 - No CGO — the sqlite driver is `modernc.org/sqlite`.
+- All key bindings go through `key.Binding` in `KeyMap`. Never match keys with raw `msg.String() ==` comparisons.
+- `Session.DisplayDir` and `Session.ShortDir` are pre-computed at load time. Do not call `os.UserHomeDir` in render paths.
 - Update this file when adding new files, modes, or architectural patterns.
