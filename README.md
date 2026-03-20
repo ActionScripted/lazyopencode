@@ -8,7 +8,7 @@ lazygit for opencode — browse, search, and preview opencode sessions; group by
 
 ## Install
 
-### Homebrew (recommended)
+### Homebrew (recommended) via [homebrew-lazyopencode](https://github.com/ActionScripted/homebrew-lazyopencode)
 
     brew install actionscripted/lazyopencode/lazyopencode
 
