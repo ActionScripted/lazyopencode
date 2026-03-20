@@ -14,6 +14,7 @@ var version = "dev"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
+	demo := flag.Bool("demo", false, "run with fake sessions for screenshots (no DB required)")
 
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
@@ -43,7 +44,7 @@ func main() {
 	dbPath := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
 
 	p := tea.NewProgram(
-		newModel(dbPath),
+		newModel(dbPath, *demo),
 		tea.WithAltScreen(),
 	)
 

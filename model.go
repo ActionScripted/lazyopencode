@@ -56,6 +56,7 @@ type model struct {
 	width                  int
 	height                 int
 	dbPath                 string
+	demoMode               bool
 	err                    error
 	messages               []Message     // messages for currently selected session; nil = loading
 	stats                  *SessionStats // stats for currently selected session; nil = loading
@@ -66,16 +67,17 @@ type model struct {
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
 }
 
-func newModel(dbPath string) model {
+func newModel(dbPath string, demoMode bool) model {
 	ti := textinput.New()
 	ti.Placeholder = "search sessions…"
 	ti.Prompt = ""
 
 	return model{
-		mode:   ModeNormal,
-		keys:   DefaultKeyMap(),
-		dbPath: dbPath,
-		search: ti,
+		mode:     ModeNormal,
+		keys:     DefaultKeyMap(),
+		dbPath:   dbPath,
+		demoMode: demoMode,
+		search:   ti,
 	}
 }
 
@@ -84,6 +86,9 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) loadSessionsCmd() tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg { return sessionsLoadedMsg{sessions: demoSessions()} }
+	}
 	return func() tea.Msg {
 		sessions, err := loadSessions(m.dbPath)
 		if err != nil {
@@ -94,6 +99,11 @@ func (m model) loadSessionsCmd() tea.Cmd {
 }
 
 func (m model) loadMessagesCmd(sessionID string) tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg {
+			return messagesLoadedMsg{sessionID: sessionID, messages: demoMessages(sessionID)}
+		}
+	}
 	return func() tea.Msg {
 		messages, err := loadMessages(m.dbPath, sessionID)
 		if err != nil {
@@ -105,6 +115,11 @@ func (m model) loadMessagesCmd(sessionID string) tea.Cmd {
 }
 
 func (m model) loadStatsCmd(sessionID string) tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg {
+			return statsLoadedMsg{sessionID: sessionID, stats: demoStats(sessionID)}
+		}
+	}
 	return func() tea.Msg {
 		stats, err := loadStats(m.dbPath, sessionID)
 		if err != nil {
