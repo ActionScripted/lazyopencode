@@ -334,7 +334,24 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 		trailSp = 1  // single trailing space
 	)
 
-	titleW := width - leadSp - dateW - dateGap - minGap - pathColW - trailSp
+	// Responsive column hiding: hide date below 50 cols, hide path below 24.
+	showDate := width >= 100
+	showPath := width >= 77
+
+	effectiveDateW := dateW
+	effectiveDateGap := dateGap
+	effectiveMinGap := minGap
+	effectivePathW := pathColW
+	if !showDate {
+		effectiveDateW = 0
+		effectiveDateGap = 0
+	}
+	if !showPath {
+		effectiveMinGap = 0
+		effectivePathW = 0
+	}
+
+	titleW := width - leadSp - effectiveDateW - effectiveDateGap - effectiveMinGap - effectivePathW - trailSp
 	if titleW < 1 {
 		titleW = 1
 	}
@@ -342,15 +359,15 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	// ── plain-text content, truncated to column widths ────────────────────────
 	date := s.UpdatedAt.Format("2006-01-02 15:04") // always exactly dateW columns
 	rawTitle := truncate(s.Title, titleW)
-	rawPath := truncate(s.ShortDirectory(), pathColW)
+	rawPath := truncate(s.ShortDirectory(), effectivePathW)
 
 	// ── pad to exact column widths (plain text, no ANSI yet) ──────────────────
 	// Title: left-aligned, space-padded on the right so the path column is pinned.
 	paddedTitle := rawTitle + strings.Repeat(" ", titleW-lipgloss.Width(rawTitle))
 	// Path: right-aligned, space-padded on the left.
-	paddedPath := strings.Repeat(" ", pathColW-lipgloss.Width(rawPath)) + rawPath
+	paddedPath := strings.Repeat(" ", effectivePathW-lipgloss.Width(rawPath)) + rawPath
 	// Trailing fill: keeps the background unbroken to the edge of the list pane.
-	assembled := leadSp + dateW + dateGap + titleW + minGap + pathColW + trailSp
+	assembled := leadSp + effectiveDateW + effectiveDateGap + titleW + effectiveMinGap + effectivePathW + trailSp
 	trailFill := strings.Repeat(" ", max(0, width-assembled))
 
 	// ── per-cell styles ───────────────────────────────────────────────────────
@@ -366,12 +383,20 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	}
 
 	styledLead := base.Render(strings.Repeat(" ", leadSp))
-	styledDate := base.Foreground(colorDim).Render(date + strings.Repeat(" ", dateGap))
-	styledTitle := base.Foreground(colorTitle).Bold(true).Render(paddedTitle + strings.Repeat(" ", minGap))
-	styledPath := base.Foreground(colorBlue).Render(paddedPath)
+	styledTitle := base.Foreground(colorTitle).Bold(true).Render(paddedTitle)
 	styledTrail := base.Render(strings.Repeat(" ", trailSp) + trailFill)
 
-	return styledLead + styledDate + styledTitle + styledPath + styledTrail
+	row := styledLead
+	if showDate {
+		row += base.Foreground(colorDim).Render(date + strings.Repeat(" ", dateGap))
+	}
+	row += styledTitle
+	if showPath {
+		row += base.Foreground(colorBlue).Render(strings.Repeat(" ", effectiveMinGap) + paddedPath)
+	}
+	row += styledTrail
+
+	return row
 }
 
 // truncate clips s to at most maxW terminal columns, appending "…" if the
