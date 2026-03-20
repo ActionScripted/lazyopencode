@@ -99,7 +99,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 | Workflow | File | Trigger | What it does |
 |----------|------|---------|-------------|
 | CI | `ci.yml` | Push to `main`, all PRs | Format check, `go vet`, golangci-lint, `go test` |
-| Release | `release.yml` | Push a `v*` tag | Vets + tests, cross-compiles for both macOS targets, publishes GitHub Release with binaries and auto-generated notes |
+| Release | `release.yml` | Push a `v*` tag | Vets + tests, cross-compiles for both macOS targets, publishes GitHub Release with binaries and auto-generated notes, and auto-updates the Homebrew tap |
 
 **Cutting a release:**
 
@@ -108,4 +108,4 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow builds `lazyopencode-<os>-<arch>` binaries for `darwin/amd64` and `darwin/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`.
+The release workflow builds `lazyopencode-<os>-<arch>` binaries for `darwin/amd64` and `darwin/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`. After publishing the GitHub Release, the workflow also commits updated version and sha256 values directly into the formula at `actionscripted/homebrew-lazyopencode` via the GitHub API, using the `TAP_GITHUB_TOKEN` secret.

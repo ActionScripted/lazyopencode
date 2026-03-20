@@ -8,32 +8,19 @@ lazygit for opencode — browse, search, and preview opencode sessions; group by
 
 ## Install
 
-### Download a binary
+### Homebrew (recommended)
 
-Download the binary for your platform from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest). Then make it executable and move it onto your `$PATH`:
+    brew install actionscripted/lazyopencode/lazyopencode
 
-```sh
-chmod +x lazyopencode-<os>-<arch>
-mv lazyopencode-<os>-<arch> ~/.local/bin/lazyopencode
-```
+To upgrade:
 
-### go install
+    brew upgrade lazyopencode
 
-Requires [Go](https://golang.org/dl/) 1.25+.
+**Other methods:**
 
-```sh
-go install github.com/actionscripted/lazyopencode@latest
-```
-
-### From source
-
-Requires [Go](https://golang.org/dl/) 1.25+.
-
-```sh
-make install
-```
-
-Builds to `build/lazyopencode` and symlinks to `~/.local/bin/lazyopencode`.
+- download a binary from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest) and move it onto your `$PATH`
+- run `go install github.com/actionscripted/lazyopencode@latest` (requires Go 1.25+)
+- build from source with `make install` (requires Go 1.25+, symlinks to `~/.local/bin/lazyopencode`).
 
 ## Usage
 
