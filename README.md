@@ -1,12 +1,12 @@
 # lazyopencode
 
-lazygit for opencode — browse, search, and preview opencode sessions; group by workspace; yank paths or IDs; open a shell in any session's directory; delete sessions individually or in bulk.
+**The lazier way to work with [OpenCode](https://opencode.ai)**. Browse, search, and preview sessions. Group by workspace, view stats, yank paths or IDs, open a shell in any session's directory, delete sessions individually or in bulk, etc.
 
 ![lazyopencode screenshot](screenshot.png)
 
 ## Requirements
 
-- [opencode](https://opencode.ai)
+Requires [OpenCode](https://opencode.ai) (duh). Supported platforms: `darwin/amd64`, `darwin/arm64`.
 
 ## Install
 
@@ -79,22 +79,16 @@ go install golang.org/x/tools/cmd/goimports@latest
 
 ## Releases
 
-Releases are cut by pushing a semver tag. The GitHub Actions release workflow
-builds binaries for all supported platforms and publishes them to GitHub
-Releases with auto-generated release notes.
+Releases are cut by pushing a semver tag. The GitHub Actions release workflow builds binaries for all supported platforms and publishes them to GitHub Releases with auto-generated release notes. Pushing a release will also auto-update the Homebrew repo.
 
 ```sh
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Supported platforms: `darwin/amd64`, `darwin/arm64`.
-
-CI runs on every push to `main` and on all pull requests (`vet` + `lint` + `test`).
-
 ## Contributing
 
-Issues and PRs are welcome. Run `make check` before submitting — it covers formatting, vetting, linting, and tests. No formal contributing process is defined yet.
+Issues and PRs are welcome! Nothing formal now, just open one and we'll see how things go. This is a free thing built to scratch an itch though and I reserve the right not to jump at every issue or request. That said, all help is welcome including new ideas or features.
 
 ## License
 
