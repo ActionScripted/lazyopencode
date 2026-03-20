@@ -289,15 +289,15 @@ func (m model) renderHint(width int) string {
 	case ModeSearch:
 		hints = "  enter/esc: back   type to filter"
 	case ModeWorkspaces:
-		hints = "  j/k: navigate   w: sessions view   q: quit"
+		hints = "  j/k: navigate   d: delete   w: toggle workspace   q: quit"
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
-		hints = "  Y/d: confirm delete   n/esc: cancel"
+		hints = "  y/d: confirm delete   n/esc: cancel"
 	case ModeYank:
 		hints = "  d: yank directory   s: yank session id   esc: cancel"
 	case ModeGotoMenu:
-		hints = "  s: shell   w: workspace view   esc: cancel"
+		hints = "  s: shell   w: toggle workspace   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: go to…   d: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: go to   d: delete   w: toggle workspace   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -311,6 +311,8 @@ func (m model) renderHint(width int) string {
 		badge = styleModeConfirmDelete.Render("DELETE?")
 	case ModeYank:
 		badge = styleModeYank.Render("YANK")
+	case ModeGotoMenu:
+		badge = styleModeGoto.Render("GOTO")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
 	}

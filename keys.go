@@ -60,7 +60,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		Workspaces: key.NewBinding(
 			key.WithKeys("w"),
-			key.WithHelp("w", "workspaces"),
+			key.WithHelp("w", "toggle workspace"),
 		),
 		Delete: key.NewBinding(
 			key.WithKeys("d"),
@@ -92,7 +92,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		GotoPrefix: key.NewBinding(
 			key.WithKeys("g"),
-			key.WithHelp("g", "go to…"),
+			key.WithHelp("g", "go to"),
 		),
 		GotoShell: key.NewBinding(
 			key.WithKeys("s"),
@@ -100,7 +100,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		GotoWorkspace: key.NewBinding(
 			key.WithKeys("w"),
-			key.WithHelp("w", "workspace"),
+			key.WithHelp("w", "toggle workspace"),
 		),
 	}
 }

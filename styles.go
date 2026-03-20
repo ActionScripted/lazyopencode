@@ -145,4 +145,10 @@ var (
 				Background(colorDanger).
 				Bold(true).
 				Padding(0, 1)
+
+	styleModeGoto = lipgloss.NewStyle().
+			Foreground(colorBg).
+			Background(colorUser).
+			Bold(true).
+			Padding(0, 1)
 )
