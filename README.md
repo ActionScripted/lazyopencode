@@ -86,7 +86,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Supported platforms: `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`.
+Supported platforms: `darwin/amd64`, `darwin/arm64`.
 
 CI runs on every push to `main` and on all pull requests (`vet` + `lint` + `test`).
 
