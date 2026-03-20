@@ -4,9 +4,12 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Tokyo Night palette
-	colorFg        = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"}
-	colorDim       = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"}
-	colorAccent    = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"}
+	colorFg        = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#a9b1d6"} // editor foreground
+	colorTitle     = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"} // bright white / variable
+	colorDim       = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
+	colorAccent    = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
+	colorBlue      = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
+	colorBg        = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
 	colorSelected  = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
 	colorBorder    = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
 	colorUser      = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
@@ -54,13 +57,14 @@ var (
 			BorderForeground(colorBorder)
 
 	styleModeNormal = lipgloss.NewStyle().
-			Reverse(true).
+			Foreground(colorBg).
+			Background(colorBlue).
 			Bold(true).
 			Padding(0, 1)
 
 	styleModeSearch = lipgloss.NewStyle().
-			Foreground(colorAccent).
-			Reverse(true).
+			Foreground(colorBg).
+			Background(colorUser).
 			Bold(true).
 			Padding(0, 1)
 )

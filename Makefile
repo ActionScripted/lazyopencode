@@ -15,5 +15,5 @@ link:
 install: build link
 
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) lazyoc
 	rm -f $(LINK)

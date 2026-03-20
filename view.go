@@ -167,7 +167,7 @@ func (m model) renderPreview(width, height int) string {
 }
 
 func (m model) renderHint(width int) string {
-	appName := styleDim.Render("Lazy") + styleDim.Copy().Bold(true).Render("OpenCode")
+	appName := styleDim.Render(" Lazy") + styleDim.Copy().Bold(true).Render("OpenCode")
 
 	var hints string
 	switch m.mode {
@@ -253,9 +253,9 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	}
 
 	styledLead := base.Render(strings.Repeat(" ", leadSp))
-	styledDate := base.Render(date + strings.Repeat(" ", dateGap))
-	styledTitle := base.Bold(true).Render(paddedTitle + strings.Repeat(" ", minGap))
-	styledPath := base.Foreground(colorAccent).Render(paddedPath)
+	styledDate := base.Foreground(colorDim).Render(date + strings.Repeat(" ", dateGap))
+	styledTitle := base.Foreground(colorTitle).Bold(true).Render(paddedTitle + strings.Repeat(" ", minGap))
+	styledPath := base.Foreground(colorBlue).Render(paddedPath)
 	styledTrail := base.Render(strings.Repeat(" ", trailSp) + trailFill)
 
 	return styledLead + styledDate + styledTitle + styledPath + styledTrail
