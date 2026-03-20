@@ -83,6 +83,12 @@ var (
 				Bold(true).
 				Padding(0, 1)
 
+	styleModeYank = lipgloss.NewStyle().
+			Foreground(colorBg).
+			Background(colorAssistant).
+			Bold(true).
+			Padding(0, 1)
+
 	// Modal (confirm-delete overlay)
 	colorDanger = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
 
@@ -99,6 +105,10 @@ var (
 	styleModalTitle = lipgloss.NewStyle().
 			Foreground(colorDanger).
 			Bold(true)
+
+	styleModalYankTitle = lipgloss.NewStyle().
+				Foreground(colorAccent).
+				Bold(true)
 
 	styleModalKey = lipgloss.NewStyle().
 			Foreground(colorBg).

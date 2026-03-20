@@ -27,6 +27,9 @@ type KeyMap struct {
 	Yank          key.Binding
 	YankDirectory key.Binding
 	YankSession   key.Binding
+	Confirm       key.Binding
+	Cancel        key.Binding
+	GotoWorkspace key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -75,6 +78,18 @@ func DefaultKeyMap() KeyMap {
 		YankSession: key.NewBinding(
 			key.WithKeys("s"),
 			key.WithHelp("s", "yank session id"),
+		),
+		Confirm: key.NewBinding(
+			key.WithKeys("y"),
+			key.WithHelp("y", "confirm"),
+		),
+		Cancel: key.NewBinding(
+			key.WithKeys("n", "esc", "q", "ctrl+c"),
+			key.WithHelp("n/esc", "cancel"),
+		),
+		GotoWorkspace: key.NewBinding(
+			key.WithKeys("g"),
+			key.WithHelp("g", "go to workspace"),
 		),
 	}
 }

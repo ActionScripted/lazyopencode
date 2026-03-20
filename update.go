@@ -36,13 +36,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeWorkspaces
 		return m, nil
 
-	case key.Matches(msg, m.keys.Delete):
+	case key.Matches(msg, m.keys.Open):
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		m.pendingDeleteID = m.filtered[m.cursor].ID
-		m.mode = ModeConfirmDelete
-		return m, nil
+		s := m.filtered[m.cursor]
+		return m, m.openSessionCmd(s.ID, s.Directory)
 
 	case key.Matches(msg, m.keys.Yank):
 		if len(m.filtered) == 0 {
@@ -51,12 +50,27 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeYank
 		return m, nil
 
-	case key.Matches(msg, m.keys.Open):
+	case key.Matches(msg, m.keys.GotoWorkspace):
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		s := m.filtered[m.cursor]
-		return m, m.openSessionCmd(s.ID, s.Directory)
+		dir := m.filtered[m.cursor].Directory
+		for i, ws := range m.workspaces {
+			if ws.Dir == dir {
+				m.workspaceCursor = i
+				break
+			}
+		}
+		m.mode = ModeWorkspaces
+		return m, nil
+
+	case key.Matches(msg, m.keys.Delete):
+		if len(m.filtered) == 0 {
+			return m, nil
+		}
+		m.pendingDeleteID = m.filtered[m.cursor].ID
+		m.mode = ModeConfirmDelete
+		return m, nil
 	}
 
 	return m, nil
@@ -69,11 +83,13 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Up):
 		m.workspaceCursor = clamp(m.workspaceCursor-1, 0, len(m.workspaces)-1)
+		return m, nil
 
 	case key.Matches(msg, m.keys.Down):
 		m.workspaceCursor = clamp(m.workspaceCursor+1, 0, len(m.workspaces)-1)
+		return m, nil
 
-	case key.Matches(msg, m.keys.Workspaces):
+	case key.Matches(msg, m.keys.Workspaces), key.Matches(msg, m.keys.Back):
 		m.mode = ModeNormal
 		return m, nil
 
@@ -81,7 +97,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.workspaces) == 0 {
 			return m, nil
 		}
-		m.pendingDeleteWorkspace = m.workspaces[m.workspaceCursor]
+		m.pendingDeleteWorkspace = m.workspaces[m.workspaceCursor].Dir
 		m.mode = ModeConfirmDeleteWorkspace
 		return m, nil
 	}
@@ -140,11 +156,11 @@ func removeSessionByID(sessions []Session, id string) []Session {
 }
 
 // updateConfirmDeleteWorkspace handles key events while
-// ModeConfirmDeleteWorkspace is active. Y or d confirms deletion of all
-// sessions in the pending workspace; n, esc, or q cancels.
+// ModeConfirmDeleteWorkspace is active. y or d confirms deletion of all
+// sessions in the pending workspace; n, esc, q, or ctrl+c cancels.
 func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "d":
+	switch {
+	case key.Matches(msg, m.keys.Delete), key.Matches(msg, m.keys.Confirm):
 		ws := m.pendingDeleteWorkspace
 		m.pendingDeleteWorkspace = ""
 		m.mode = ModeWorkspaces
@@ -173,7 +189,7 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		// Delete all sessions in one command to avoid an N-reload storm.
 		return m, m.deleteSessionsCmd(ids)
 
-	case "n", "esc", "q", "ctrl+c":
+	case key.Matches(msg, m.keys.Cancel):
 		m.pendingDeleteWorkspace = ""
 		m.mode = ModeWorkspaces
 		return m, nil
@@ -183,8 +199,8 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 }
 
 func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "d":
+	switch {
+	case key.Matches(msg, m.keys.Delete), key.Matches(msg, m.keys.Confirm):
 		id := m.pendingDeleteID
 		m.pendingDeleteID = ""
 		m.mode = ModeNormal
@@ -208,7 +224,7 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmd = m.deleteSessionCmd(id)
 		return m, cmd
 
-	case "n", "esc", "q", "ctrl+c":
+	case key.Matches(msg, m.keys.Cancel):
 		m.pendingDeleteID = ""
 		m.mode = ModeNormal
 		return m, nil
@@ -230,11 +246,11 @@ func (m model) updateYank(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.YankDirectory):
 		m.mode = ModeNormal
-		return m, yankCmd(s.DisplayDirectory())
+		return m, m.yankCmd(s.DisplayDirectory())
 
 	case key.Matches(msg, m.keys.YankSession):
 		m.mode = ModeNormal
-		return m, yankCmd(s.ID)
+		return m, m.yankCmd(s.ID)
 
 	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
 		m.mode = ModeNormal

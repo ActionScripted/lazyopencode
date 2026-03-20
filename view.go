@@ -289,7 +289,7 @@ func (m model) renderHint(width int) string {
 	case ModeYank:
 		hints = "  d: yank directory   s: yank session id   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   y: yank   dd: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: workspace   dd: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -301,6 +301,8 @@ func (m model) renderHint(width int) string {
 		badge = styleModeWorkspaces.Render("WORKSPACES")
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		badge = styleModeConfirmDelete.Render("DELETE?")
+	case ModeYank:
+		badge = styleModeYank.Render("YANK")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
 	}
@@ -340,7 +342,7 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 		trailSp = 1  // single trailing space
 	)
 
-	// Responsive column hiding: hide date below 50 cols, hide path below 24.
+	// Responsive column hiding: hide date below 100 cols, hide path below 77.
 	showDate := width >= 100
 	showPath := width >= 77
 
@@ -469,7 +471,7 @@ func (m model) renderYankModal() string {
 	dKey := styleModalKeyYank.Render("d")
 	sKey := styleModalKeyYank.Render("s")
 
-	content := styleDim.Copy().Foreground(colorAccent).Bold(true).Render("Yank to clipboard") + "\n\n" +
+	content := styleModalYankTitle.Render("Yank to clipboard") + "\n\n" +
 		dKey + styleDim.Render("  directory") + "\n" +
 		sKey + styleDim.Render("  session id")
 
@@ -573,26 +575,25 @@ func (m model) renderWorkspaceList(width, height int) string {
 	for i := visibleStart; i < len(m.workspaces) && i < visibleStart+height; i++ {
 		ws := m.workspaces[i]
 		selected := i == m.workspaceCursor
-		sb.WriteString(formatWorkspaceRow(ws, width, selected) + "\n")
+		sb.WriteString(formatWorkspaceRow(ws.Dir, ws.DisplayDir, width, selected) + "\n")
 	}
 
 	return sb.String()
 }
 
 // formatWorkspaceRow renders a single workspace directory as a fixed-width row.
-// The directory is displayed with "~" substitution and truncated to fit.
-func formatWorkspaceRow(dir string, width int, selected bool) string {
+// displayDir is the pre-computed display string (with "~" substitution).
+func formatWorkspaceRow(dir, displayDir string, width int, selected bool) string {
 	const leadSp = 1
 	const trailSp = 1
 
-	// Substitute home directory with "~" for display.
-	display := displayDir(dir)
+	_ = dir // raw dir available if needed in future; display uses displayDir
 
 	innerW := width - leadSp - trailSp
 	if innerW < 1 {
 		innerW = 1
 	}
-	raw := truncate(display, innerW)
+	raw := truncate(displayDir, innerW)
 	padded := raw + strings.Repeat(" ", max(0, innerW-lipgloss.Width(raw)))
 
 	base := lipgloss.NewStyle().Foreground(colorAccent).Background(colorBgPanel)
@@ -623,16 +624,15 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 	// Filter sessions belonging to the selected workspace.
 	var wsSessions []Session
 	for _, s := range m.sessions {
-		if s.Directory == selectedWS {
+		if s.Directory == selectedWS.Dir {
 			wsSessions = append(wsSessions, s)
 		}
 	}
 
 	// ── header ────────────────────────────────────────────────────────────────
 	var header strings.Builder
-	displayPath := displayDir(selectedWS)
 	header.WriteString(stylePreviewTitle.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(displayPath),
+		lipgloss.NewStyle().MaxWidth(inner).Render(selectedWS.DisplayDir),
 	))
 	header.WriteString("\n")
 	header.WriteString(styleDim.Render(

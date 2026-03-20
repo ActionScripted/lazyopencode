@@ -43,6 +43,13 @@ func (s Session) FilterValue() string {
 	return s.Title + " " + s.Directory
 }
 
+// workspace represents a unique project directory that owns one or more sessions.
+// DisplayDir is pre-computed at load time to avoid repeated os.UserHomeDir calls.
+type workspace struct {
+	Dir        string // raw absolute path — used for session matching and DB queries
+	DisplayDir string // "~"-substituted path — used for display only
+}
+
 // DisplayDirectory returns the pre-computed display path (home replaced by "~").
 func (s Session) DisplayDirectory() string {
 	return s.DisplayDir

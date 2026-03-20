@@ -55,7 +55,7 @@ type model struct {
 	messages               []Message     // messages for currently selected session; nil = loading
 	stats                  *SessionStats // stats for currently selected session; nil = loading
 	previewSessionID       string        // session ID whose messages are loaded
-	workspaces             []string      // sorted unique workspace directories
+	workspaces             []workspace   // sorted unique workspace directories
 	workspaceCursor        int           // cursor into workspaces slice
 	pendingDeleteID        string        // session ID awaiting delete confirmation
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
@@ -122,7 +122,7 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 
 // yankCmd copies text to the system clipboard using pbcopy (macOS) or
 // xclip (Linux). Fails silently — a missing clipboard tool is not fatal.
-func yankCmd(text string) tea.Cmd {
+func (m model) yankCmd(text string) tea.Cmd {
 	return func() tea.Msg {
 		var c *exec.Cmd
 		switch runtime.GOOS {
@@ -168,11 +168,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case sessionsLoadedMsg:
+		// Preserve the selected workspace across reloads by remembering the raw
+		// directory before rebuilding, then re-finding it in the new slice.
+		prevWS := ""
+		if m.workspaceCursor < len(m.workspaces) {
+			prevWS = m.workspaces[m.workspaceCursor].Dir
+		}
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
 		m.workspaces = buildWorkspaces(m.sessions)
 		m.cursor = 0
 		m.workspaceCursor = 0
+		for i, ws := range m.workspaces {
+			if ws.Dir == prevWS {
+				m.workspaceCursor = i
+				break
+			}
+		}
 		if len(m.filtered) > 0 {
 			id := m.filtered[0].ID
 			m.previewSessionID = id
@@ -249,18 +261,19 @@ func filterSessions(sessions []Session, query string) []Session {
 	return out
 }
 
-// buildWorkspaces returns a sorted, deduplicated list of directories from
-// the given sessions. Called once when sessions are loaded.
-func buildWorkspaces(sessions []Session) []string {
+// buildWorkspaces returns a sorted, deduplicated list of workspace values from
+// the given sessions. DisplayDir is pre-computed once here to avoid calling
+// os.UserHomeDir on every render frame.
+func buildWorkspaces(sessions []Session) []workspace {
 	seen := make(map[string]struct{}, len(sessions))
 	for _, s := range sessions {
 		seen[s.Directory] = struct{}{}
 	}
-	ws := make([]string, 0, len(seen))
+	ws := make([]workspace, 0, len(seen))
 	for dir := range seen {
-		ws = append(ws, dir)
+		ws = append(ws, workspace{Dir: dir, DisplayDir: displayDir(dir)})
 	}
-	sort.Strings(ws)
+	sort.Slice(ws, func(i, j int) bool { return ws[i].Dir < ws[j].Dir })
 	return ws
 }
 
