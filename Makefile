@@ -1,5 +1,5 @@
-BINARY  := build/lazyoc
-LINK    := $(HOME)/.local/bin/lazyoc
+BINARY  := build/lazyopencode
+LINK    := $(HOME)/.local/bin/lazyopencode
 SRC     := $(wildcard *.go)
 
 .PHONY: build link install clean fmt vet lint test check
@@ -15,7 +15,7 @@ link:
 install: build link
 
 clean:
-	rm -f $(BINARY) lazyoc
+	rm -f $(BINARY) lazyopencode
 	rm -f $(LINK)
 
 fmt:

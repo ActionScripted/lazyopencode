@@ -86,12 +86,6 @@ var (
 			Bold(true).
 			Padding(0, 1)
 
-	styleModeGoto = lipgloss.NewStyle().
-			Foreground(colorBg).
-			Background(colorUser).
-			Bold(true).
-			Padding(0, 1)
-
 	// Modal (confirm-delete overlay)
 	colorDanger = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
 

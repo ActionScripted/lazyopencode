@@ -115,7 +115,7 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 	}
 }
 
-// openSessionCmd suspends lazyoc, hands the terminal to opencode running in
+// openSessionCmd suspends lazyopencode, hands the terminal to opencode running in
 // the session's directory, then resumes and reloads sessions when it exits.
 func (m model) openSessionCmd(id, dir string) tea.Cmd {
 	c := exec.Command("opencode", "--session", id)
@@ -126,7 +126,7 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 }
 
 // openShellCmd prints a suspend notice then hands the terminal to $SHELL
-// in the given directory. lazyoc resumes automatically when the shell exits.
+// in the given directory. lazyopencode resumes automatically when the shell exits.
 func (m model) openShellCmd(dir string) tea.Cmd {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
@@ -135,7 +135,7 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	c := exec.Command(shell)
 	c.Dir = dir
 	printCmd := func() tea.Msg {
-		fmt.Fprintf(os.Stdout, "\nopening shell in %s — type 'exit' to return to lazyoc\n\n", displayDir(dir))
+		_, _ = fmt.Fprintf(os.Stdout, "\nopening shell in %s — type 'exit' to return to lazyopencode\n\n", displayDir(dir))
 		return nil
 	}
 	return tea.Sequence(printCmd, tea.ExecProcess(c, func(err error) tea.Msg {

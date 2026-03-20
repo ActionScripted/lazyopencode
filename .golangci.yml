@@ -32,4 +32,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/actionscripted/lazyoc
+        - github.com/actionscripted/lazyopencode

@@ -481,7 +481,7 @@ func (m model) renderGotoModal() string {
 
 	content := styleModalGotoTitle.Render("Go to…") + "\n\n" +
 		sKey + "  open shell" + "\n" +
-		styleDim.Render("     type 'exit' to return to lazyoc") + "\n" +
+		styleDim.Render("     type 'exit' to return to lazyopencode") + "\n" +
 		wKey + "  workspace view"
 
 	return styleModalGoto.Render(content)

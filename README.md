@@ -1,6 +1,6 @@
-# lazyoc
+# lazyopencode
 
-lazygit for opencode — a terminal UI for managing opencode sessions.
+lazygit for opencode — browse, search, and preview opencode sessions; group by workspace; yank paths or IDs; open a shell in any session's directory; delete sessions individually or in bulk.
 
 ## Requirements
 
@@ -23,27 +23,38 @@ go install golang.org/x/tools/cmd/goimports@latest
 make install
 ```
 
-Builds to `build/lazyoc` and symlinks to `~/.local/bin/lazyoc`.
+Builds to `build/lazyopencode` and symlinks to `~/.local/bin/lazyopencode`.
 
 ## Usage
 
 ```sh
-lazyoc
+lazyopencode
 ```
 
 ## Keybinds
 
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Navigate down / up |
-| `enter` | Open selected session in opencode |
-| `/` | Search / filter |
-| `tab` | Toggle sessions / paths view |
-| `ctrl-s` | Toggle subagent sessions |
-| `p` | Toggle preview pane |
-| `ctrl-d` | Delete selected session or path |
-| `ctrl-x` | Delete all sessions |
-| `q` / `esc` | Quit |
+| Key | Context | Action |
+|-----|---------|--------|
+| `j` / `↓` | Normal, Workspaces | Move down |
+| `k` / `↑` | Normal, Workspaces | Move up |
+| `enter` | Normal | Open selected session in opencode |
+| `/` | Normal | Search / filter |
+| `w` | Normal | Workspaces view |
+| `y` | Normal | Yank sub-menu |
+| `g` | Normal | Goto sub-menu |
+| `d` | Normal | Delete selected session |
+| `q` / `esc` | Normal | Quit |
+| `esc` | Search | Return to normal mode |
+| `d` | Workspaces | Delete all sessions in selected workspace |
+| `w` / `esc` | Workspaces | Return to normal mode |
+| `d` | Yank | Copy session directory to clipboard |
+| `s` | Yank | Copy session ID to clipboard |
+| `esc` / `q` | Yank | Cancel |
+| `s` | Goto | Open `$SHELL` in the session's directory |
+| `w` | Goto | Jump to that session's workspace |
+| `esc` / `q` | Goto | Cancel |
+| `y` / `d` | Delete confirm | Confirm |
+| `n` / `esc` | Delete confirm | Cancel |
 
 ## Development
 

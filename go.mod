@@ -1,4 +1,4 @@
-module github.com/actionscripted/lazyoc
+module github.com/actionscripted/lazyopencode
 
 go 1.25.0
 

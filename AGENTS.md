@@ -1,6 +1,6 @@
-# lazyoc
+# lazyopencode
 
-lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessions — think lazygit but for opencode. It reads opencode's SQLite database directly (read-only) and lets you browse, search, preview, and open sessions without leaving the terminal.
+lazyopencode is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessions — think lazygit but for opencode. It reads opencode's SQLite database directly (read-only) and lets you browse, search, preview, and open sessions without leaving the terminal.
 
 ## Tech stack
 
@@ -46,7 +46,7 @@ Styles are declared as package-level `var`s in `styles.go` and nowhere else. Thi
 
 DB functions open their own connection, run their query, and close. SQLite read-only connections are cheap — a shared pool adds complexity with no real benefit here. Don't optimize this.
 
-Session deletion shells out to `opencode session delete <id>` rather than writing directly to the SQLite DB. This is intentional — it keeps lazyoc read-only at the DB layer and delegates mutations to the owning process.
+Session deletion shells out to `opencode session delete <id>` rather than writing directly to the SQLite DB. This is intentional — it keeps lazyopencode read-only at the DB layer and delegates mutations to the owning process.
 
 ## Where to make changes
 

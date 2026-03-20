@@ -11,7 +11,7 @@ import (
 func main() {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "lazyoc: could not resolve home directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "lazyopencode: could not resolve home directory: %v\n", err)
 		os.Exit(1)
 	}
 	dbPath := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
@@ -22,7 +22,7 @@ func main() {
 	)
 
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "lazyoc: %v\n", err)
+		fmt.Fprintf(os.Stderr, "lazyopencode: %v\n", err)
 		os.Exit(1)
 	}
 }
