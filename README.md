@@ -43,28 +43,33 @@ lazyopencode
 
 ## Keybinds
 
-| Key         | Context            | Action                                    |
-| ----------- | ------------------ | ----------------------------------------- |
-| `j` / `↓`   | Normal, Workspaces | Move down                                 |
-| `k` / `↑`   | Normal, Workspaces | Move up                                   |
-| `enter`     | Normal             | Open selected session in opencode         |
-| `/`         | Normal             | Search / filter                           |
-| `w`         | Normal             | Workspaces view                           |
-| `y`         | Normal             | Yank sub-menu                             |
-| `g`         | Normal             | Goto sub-menu                             |
-| `d`         | Normal             | Delete selected session                   |
-| `q` / `esc` | Normal             | Quit                                      |
-| `esc`       | Search             | Return to normal mode                     |
-| `d`         | Workspaces         | Delete all sessions in selected workspace |
-| `w` / `esc` | Workspaces         | Return to normal mode                     |
-| `d`         | Yank               | Copy session directory to clipboard       |
-| `s`         | Yank               | Copy session ID to clipboard              |
-| `esc` / `q` | Yank               | Cancel                                    |
-| `s`         | Goto               | Open `$SHELL` in the session's directory  |
-| `w`         | Goto               | Jump to that session's workspace          |
-| `esc` / `q` | Goto               | Cancel                                    |
-| `y` / `d`   | Delete confirm     | Confirm                                   |
-| `n` / `esc` | Delete confirm     | Cancel                                    |
+We're going for Vim-style binds for speed. We have a normal mode with sessions, search and a workspace mode for extra laziness.
+
+### Modes
+
+| Key | Mode       | Notes                                                    |
+| --- | ---------- | -------------------------------------------------------- |
+| `/` | Search     | Type to filter; `esc` to exit                            |
+| `w` | Workspaces | `d` deletes all sessions in workspace; `w`/`esc` to exit |
+
+### Movement
+
+| Key         | Action                |
+| ----------- | --------------------- |
+| `j` / `↓`   | Down                  |
+| `k` / `↑`   | Up                    |
+| `enter`     | Open selected session |
+| `q` / `esc` | Quit / back           |
+
+### Chords
+
+| Keys | Action                               |
+| ---- | ------------------------------------ |
+| `dd` | Delete selected session              |
+| `gs` | Open `$SHELL` in session's directory |
+| `gw` | Jump to session's workspace          |
+| `yd` | Yank session directory to clipboard  |
+| `ys` | Yank session ID to clipboard         |
 
 ## Development
 
