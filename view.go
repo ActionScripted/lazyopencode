@@ -52,6 +52,10 @@ func (m model) View() string {
 		return overlayModal(base, m.renderYankModal(), w, h)
 	}
 
+	if m.mode == ModeGotoMenu {
+		return overlayModal(base, m.renderGotoModal(), w, h)
+	}
+
 	return base
 }
 
@@ -288,8 +292,10 @@ func (m model) renderHint(width int) string {
 		hints = "  Y/d: confirm delete   n/esc: cancel"
 	case ModeYank:
 		hints = "  d: yank directory   s: yank session id   esc: cancel"
+	case ModeGotoMenu:
+		hints = "  s: shell   w: workspace view   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: shell   dd: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: go to…   d: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -464,6 +470,18 @@ func overlayModal(base, rendered string, w, h int) string {
 	}
 
 	return strings.Join(baseLines, "\n")
+}
+
+// renderGotoModal returns the styled modal for the g-prefix goto menu.
+func (m model) renderGotoModal() string {
+	sKey := styleModalKeyGoto.Render("s")
+	wKey := styleModalKeyGoto.Render("w")
+
+	content := styleModalGotoTitle.Render("Go to…") + "\n\n" +
+		sKey + styleDim.Render("  shell") + "\n" +
+		wKey + styleDim.Render("  workspace view")
+
+	return styleModalGoto.Render(content)
 }
 
 // renderYankModal returns the styled modal for the yank-to-clipboard prompt.

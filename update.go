@@ -50,11 +50,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeYank
 		return m, nil
 
-	case key.Matches(msg, m.keys.GotoWorkspace):
+	case key.Matches(msg, m.keys.GotoPrefix):
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		return m, m.openShellCmd(m.filtered[m.cursor].Directory)
+		m.mode = ModeGotoMenu
+		return m, nil
 
 	case key.Matches(msg, m.keys.Delete):
 		if len(m.filtered) == 0 {
@@ -225,7 +226,39 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateYank handles key events while ModeYank is active.
+// updateGotoMenu handles key events while ModeGotoMenu is active.
+// s opens a shell in the session's directory; w jumps to the workspace view.
+// esc/q/n cancels back to normal mode.
+func (m model) updateGotoMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if len(m.filtered) == 0 {
+		m.mode = ModeNormal
+		return m, nil
+	}
+	s := m.filtered[m.cursor]
+
+	switch {
+	case key.Matches(msg, m.keys.GotoShell):
+		m.mode = ModeNormal
+		return m, m.openShellCmd(s.Directory)
+
+	case key.Matches(msg, m.keys.GotoWorkspace):
+		m.mode = ModeWorkspaces
+		for i, ws := range m.workspaces {
+			if ws.Dir == s.Directory {
+				m.workspaceCursor = i
+				break
+			}
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
+		m.mode = ModeNormal
+		return m, nil
+	}
+
+	return m, nil
+}
+
 // d yanks the session's display directory; s yanks the session ID.
 // esc/q cancels back to normal mode.
 func (m model) updateYank(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

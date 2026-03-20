@@ -12,6 +12,7 @@ const (
 	ModeConfirmDelete
 	ModeConfirmDeleteWorkspace
 	ModeYank
+	ModeGotoMenu
 )
 
 // KeyMap holds all named key bindings for the application.
@@ -29,6 +30,8 @@ type KeyMap struct {
 	YankSession   key.Binding
 	Confirm       key.Binding
 	Cancel        key.Binding
+	GotoPrefix    key.Binding
+	GotoShell     key.Binding
 	GotoWorkspace key.Binding
 }
 
@@ -87,9 +90,17 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("n", "esc", "q", "ctrl+c"),
 			key.WithHelp("n/esc", "cancel"),
 		),
-		GotoWorkspace: key.NewBinding(
+		GotoPrefix: key.NewBinding(
 			key.WithKeys("g"),
-			key.WithHelp("g", "open shell"),
+			key.WithHelp("g", "go to…"),
+		),
+		GotoShell: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "shell"),
+		),
+		GotoWorkspace: key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "workspace"),
 		),
 	}
 }

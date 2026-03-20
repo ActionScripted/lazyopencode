@@ -262,6 +262,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateConfirmDeleteWorkspace(msg)
 		case ModeYank:
 			return m.updateYank(msg)
+		case ModeGotoMenu:
+			return m.updateGotoMenu(msg)
 		}
 	}
 	return m, nil
