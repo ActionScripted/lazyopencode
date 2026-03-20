@@ -2,6 +2,8 @@
 
 lazygit for opencode — browse, search, and preview opencode sessions; group by workspace; yank paths or IDs; open a shell in any session's directory; delete sessions individually or in bulk.
 
+![lazyopencode screenshot](screenshot.png)
+
 ## Requirements
 
 - [opencode](https://opencode.ai)
