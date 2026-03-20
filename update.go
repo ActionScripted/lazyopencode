@@ -60,6 +60,14 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Tab):
 		m.mode = ModeNormal
 		return m, nil
+
+	case msg.String() == "d":
+		if len(m.workspaces) == 0 {
+			return m, nil
+		}
+		m.pendingDeleteWorkspace = m.workspaces[m.workspaceCursor]
+		m.mode = ModeConfirmDeleteWorkspace
+		return m, nil
 	}
 
 	return m, nil
@@ -113,8 +121,48 @@ func removeSessionByID(sessions []Session, id string) []Session {
 	return out
 }
 
-// updateConfirmDelete handles key events while ModeConfirmDelete is active.
-// Y or d confirms the delete; n, esc, or q cancels.
+// updateConfirmDeleteWorkspace handles key events while
+// ModeConfirmDeleteWorkspace is active. Y or d confirms deletion of all
+// sessions in the pending workspace; n, esc, or q cancels.
+func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "d":
+		ws := m.pendingDeleteWorkspace
+		m.pendingDeleteWorkspace = ""
+		m.mode = ModeWorkspaces
+
+		if ws == "" {
+			return m, nil
+		}
+
+		// Collect IDs belonging to the workspace.
+		var ids []string
+		for _, s := range m.sessions {
+			if s.Directory == ws {
+				ids = append(ids, s.ID)
+			}
+		}
+
+		// Optimistic removal.
+		for _, id := range ids {
+			m.sessions = removeSessionByID(m.sessions, id)
+			m.filtered = removeSessionByID(m.filtered, id)
+		}
+		m.workspaces = buildWorkspaces(m.sessions)
+		m.workspaceCursor = clamp(m.workspaceCursor, 0, max(0, len(m.workspaces)-1))
+		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
+
+		// Delete all sessions in one command to avoid an N-reload storm.
+		return m, m.deleteSessionsCmd(ids)
+
+	case "n", "esc", "q", "ctrl+c":
+		m.pendingDeleteWorkspace = ""
+		m.mode = ModeWorkspaces
+		return m, nil
+	}
+
+	return m, nil
+}
 func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "d":

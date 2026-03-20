@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -21,6 +22,11 @@ func (m model) View() string {
 		return m.renderWorkspacesView(w, h)
 	}
 
+	if m.mode == ModeConfirmDeleteWorkspace {
+		base := m.renderWorkspacesView(w, h)
+		return overlayModal(base, m.renderWorkspaceModal(), w, h)
+	}
+
 	previewW := w * 45 / 100
 	if previewW < 30 {
 		previewW = 30
@@ -38,7 +44,7 @@ func (m model) View() string {
 	base := body + "\n" + hint
 
 	if m.mode == ModeConfirmDelete {
-		return m.renderWithModal(base, w, h)
+		return overlayModal(base, m.renderSessionModal(), w, h)
 	}
 
 	return base
@@ -188,6 +194,8 @@ func (m model) renderHint(width int) string {
 		hints = "  j/k: navigate   tab: sessions view   q: quit"
 	case ModeConfirmDelete:
 		hints = "  Y/d: confirm delete   n/esc: cancel"
+	case ModeConfirmDeleteWorkspace:
+		hints = "  Y/d: confirm delete   n/esc: cancel"
 	default:
 		hints = "  j/k: navigate   /: search   dd: delete   tab: workspaces   q: quit"
 	}
@@ -200,6 +208,8 @@ func (m model) renderHint(width int) string {
 	case ModeWorkspaces:
 		badge = styleModeWorkspaces.Render("WORKSPACES")
 	case ModeConfirmDelete:
+		badge = styleModeConfirmDelete.Render("DELETE?")
+	case ModeConfirmDeleteWorkspace:
 		badge = styleModeConfirmDelete.Render("DELETE?")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
@@ -309,44 +319,14 @@ func truncate(s string, maxW int) string {
 	return string(out) + "…"
 }
 
-// renderWithModal overlays a centered confirmation modal on top of the
-// already-rendered base view. The base is split by newlines; the modal rows
-// are written over the middle lines so the background content is still
-// partially visible around it.
-func (m model) renderWithModal(base string, w, h int) string {
-	// ── build modal content ───────────────────────────────────────────────────
-	title := styleModalTitle.Render("Delete session?")
-
-	// Find the session title for the pending ID.
-	sessionTitle := m.pendingDeleteID
-	for _, s := range m.sessions {
-		if s.ID == m.pendingDeleteID {
-			sessionTitle = s.Title
-			break
-		}
-	}
-
-	// Truncate the session title so it fits inside the modal with padding.
-	const modalInnerW = 46
-	truncatedTitle := truncate(sessionTitle, modalInnerW)
-
-	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
-		styleModalKeyCancel.Render("No [n]")
-
-	modalContent := title + "\n\n" +
-		stylePreviewTitle.Render(truncatedTitle) + "\n\n" +
-		confirm
-
-	rendered := styleModal.Render(modalContent)
-
+// overlayModal centers a pre-rendered modal string over the base view.
+// The base is split by newlines; the modal rows are spliced over the middle
+// lines so the background content remains partially visible around it.
+func overlayModal(base, rendered string, w, h int) string {
 	modalW := lipgloss.Width(rendered)
 	modalH := lipgloss.Height(rendered)
 
-	// ── overlay onto base ─────────────────────────────────────────────────────
-	// Split the base into lines, pad each to full width, then overwrite the
-	// center region with the modal lines.
 	baseLines := strings.Split(base, "\n")
-	// Ensure we have enough lines.
 	for len(baseLines) < h {
 		baseLines = append(baseLines, "")
 	}
@@ -386,6 +366,57 @@ func (m model) renderWithModal(base string, w, h int) string {
 	}
 
 	return strings.Join(baseLines, "\n")
+}
+
+// renderSessionModal returns the styled modal for a single-session delete.
+func (m model) renderSessionModal() string {
+	const modalInnerW = 46
+
+	sessionTitle := m.pendingDeleteID
+	for _, s := range m.sessions {
+		if s.ID == m.pendingDeleteID {
+			sessionTitle = s.Title
+			break
+		}
+	}
+
+	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
+		styleModalKeyCancel.Render("No [n]")
+
+	content := styleModalTitle.Render("Delete session?") + "\n\n" +
+		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerW)) + "\n\n" +
+		confirm
+
+	return styleModal.Render(content)
+}
+
+// renderWorkspaceModal returns the styled modal for a workspace delete.
+func (m model) renderWorkspaceModal() string {
+	const modalInnerW = 46
+
+	count := 0
+	for _, s := range m.sessions {
+		if s.Directory == m.pendingDeleteWorkspace {
+			count++
+		}
+	}
+
+	noun := "sessions"
+	if count == 1 {
+		noun = "session"
+	}
+	countLine := stylePreviewTitle.Render(fmt.Sprintf("%d", count)) +
+		styleDim.Render(" "+noun+" will be deleted")
+
+	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
+		styleModalKeyCancel.Render("No [n]")
+
+	content := styleModalTitle.Render("Delete workspace?") + "\n\n" +
+		stylePreviewTitle.Render(truncate(displayDir(m.pendingDeleteWorkspace), modalInnerW)) + "\n" +
+		countLine + "\n\n" +
+		confirm
+
+	return styleModal.Render(content)
 }
 
 // ── Workspaces view ───────────────────────────────────────────────────────────

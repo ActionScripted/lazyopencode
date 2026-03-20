@@ -29,21 +29,22 @@ type errMsg struct {
 }
 
 type model struct {
-	mode             Mode
-	keys             KeyMap
-	sessions         []Session
-	filtered         []Session
-	cursor           int
-	search           textinput.Model
-	width            int
-	height           int
-	dbPath           string
-	err              error
-	messages         []Message // messages for currently selected session; nil = loading
-	previewSessionID string    // session ID whose messages are loaded
-	workspaces       []string  // sorted unique workspace directories
-	workspaceCursor  int       // cursor into workspaces slice
-	pendingDeleteID  string    // session ID awaiting delete confirmation
+	mode                   Mode
+	keys                   KeyMap
+	sessions               []Session
+	filtered               []Session
+	cursor                 int
+	search                 textinput.Model
+	width                  int
+	height                 int
+	dbPath                 string
+	err                    error
+	messages               []Message // messages for currently selected session; nil = loading
+	previewSessionID       string    // session ID whose messages are loaded
+	workspaces             []string  // sorted unique workspace directories
+	workspaceCursor        int       // cursor into workspaces slice
+	pendingDeleteID        string    // session ID awaiting delete confirmation
+	pendingDeleteWorkspace string    // workspace directory awaiting delete confirmation
 }
 
 func newModel(dbPath string) model {
@@ -88,6 +89,20 @@ func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 	return func() tea.Msg {
 		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
 			return errMsg{err: err}
+		}
+		return sessionDeletedMsg{}
+	}
+}
+
+// deleteSessionsCmd deletes multiple sessions sequentially in a single
+// goroutine and returns one sessionDeletedMsg when all are done, avoiding
+// an N-reload storm on workspace delete.
+func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
+	return func() tea.Msg {
+		for _, id := range ids {
+			if err := exec.Command("opencode", "session", "delete", id).Run(); err != nil {
+				return errMsg{err: err}
+			}
 		}
 		return sessionDeletedMsg{}
 	}
@@ -140,6 +155,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateWorkspaces(msg)
 		case ModeConfirmDelete:
 			return m.updateConfirmDelete(msg)
+		case ModeConfirmDeleteWorkspace:
+			return m.updateConfirmDeleteWorkspace(msg)
 		}
 	}
 	return m, nil
