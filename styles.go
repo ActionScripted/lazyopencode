@@ -11,17 +11,14 @@ var (
 	colorBlue      = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
 	colorBg        = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
 	colorBgPanel   = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
-	colorBgElement = lipgloss.AdaptiveColor{Light: "#c8c9ce", Dark: "#222436"} // opencode backgroundElement — inputs, interactive elements
 	colorSelected  = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
 	colorBorder    = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
 	colorUser      = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
 	colorAssistant = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
-	colorSubtle    = lipgloss.AdaptiveColor{Light: "#9699a3", Dark: "#414868"} // Tokyo Night comments
 
 	// Text
-	styleDim       = lipgloss.NewStyle().Foreground(colorDim)
-	styleAccent    = lipgloss.NewStyle().Foreground(colorAccent)
-	styleDateMuted = lipgloss.NewStyle().Foreground(colorSubtle)
+	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
+	styleAccent = lipgloss.NewStyle().Foreground(colorAccent)
 
 	styleSearchPrefix = lipgloss.NewStyle().
 				Foreground(colorAccent).

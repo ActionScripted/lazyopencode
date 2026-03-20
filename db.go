@@ -16,7 +16,7 @@ func loadSessions(dbPath string) ([]Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Ping to detect missing file early — sqlite returns an error here if the
 	// file doesn't exist when opened read-only.
@@ -38,7 +38,7 @@ func loadSessions(dbPath string) ([]Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []Session
 	for rows.Next() {
@@ -71,7 +71,7 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.Ping(); err != nil {
 		return []Message{}, nil
@@ -91,7 +91,7 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query messages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var messages []Message
 	for rows.Next() {
@@ -120,7 +120,7 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 	if err != nil {
 		return SessionStats{}, fmt.Errorf("open db: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.Ping(); err != nil {
 		return SessionStats{}, nil

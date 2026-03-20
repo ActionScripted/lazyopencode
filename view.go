@@ -164,7 +164,7 @@ func (m model) renderPreview(width, height int) string {
 
 		// messages
 		header.WriteString(metaLabel("messages"))
-		header.WriteString(fmt.Sprintf("%d", st.MsgCount))
+		fmt.Fprintf(&header, "%d", st.MsgCount)
 		header.WriteString("\n")
 
 		// context + output tokens (only when AI turns exist)
@@ -181,7 +181,7 @@ func (m model) renderPreview(width, height int) string {
 		// changes (only when files were modified)
 		if s.SummaryFiles > 0 {
 			header.WriteString(metaLabel("changes"))
-			header.WriteString(fmt.Sprintf("%d files (", s.SummaryFiles))
+			fmt.Fprintf(&header, "%d files (", s.SummaryFiles)
 			header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
 			header.WriteString(" ")
 			header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
@@ -276,7 +276,7 @@ func formatTokens(n int) string {
 }
 
 func (m model) renderHint(width int) string {
-	appName := styleDim.Render(" Lazy") + styleDim.Copy().Bold(true).Render("OpenCode")
+	appName := styleDim.Render(" Lazy") + styleDim.Bold(true).Render("OpenCode")
 
 	var hints string
 	switch m.mode {
@@ -601,9 +601,9 @@ func formatWorkspaceRow(dir, displayDir string, width int, selected bool) string
 		base = base.Background(colorSelected)
 	}
 
-	lead := base.Copy().Foreground(colorFg).Render(strings.Repeat(" ", leadSp))
+	lead := base.Foreground(colorFg).Render(strings.Repeat(" ", leadSp))
 	text := base.Bold(selected).Render(padded)
-	trail := base.Copy().Foreground(colorFg).Render(strings.Repeat(" ", trailSp))
+	trail := base.Foreground(colorFg).Render(strings.Repeat(" ", trailSp))
 
 	return lead + text + trail
 }
