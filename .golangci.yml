@@ -1,0 +1,35 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - misspell
+    - revive
+    - staticcheck
+    - unused
+  settings:
+    revive:
+      rules:
+        # Disable pedantic doc-comment requirement on exported symbols
+        - name: exported
+          disabled: true
+    errcheck:
+      # Don't flag intentional blank-identifier discards: _ = foo()
+      check-blank: false
+  exclusions:
+    rules:
+      # errcheck is noisy in test files
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/actionscripted/lazyoc

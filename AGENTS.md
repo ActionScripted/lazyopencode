@@ -22,7 +22,9 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 | `session.go` | `Session` and `Message` types; `displayDir` and `shortDir` helpers |
 | `db.go` | SQLite queries — `loadSessions` and `loadMessages`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
 | `styles.go` | Lip Gloss style definitions |
-| `Makefile` | `make install` builds and symlinks to `~/.local/bin/lazyoc` |
+| `Makefile` | `build`, `install`, `fmt`, `vet`, `lint`, `test`, `check` targets |
+| `.golangci.yml` | golangci-lint configuration |
+| `.editorconfig` | Editor conventions (tabs, UTF-8, trailing newlines) |
 
 ## Data flow
 
@@ -30,7 +32,7 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 2. `Session.DisplayDir`, `Session.ShortDir`, `Session.CreatedAt`, and the `Summary*` fields are computed/populated once at load time in `db.go` — not on every render call.
 3. Sessions are displayed in a list; filtering happens in-memory via `filterSessions`.
 4. When a session is selected, `loadMessagesForCursor` fires a `tea.Batch` of two commands: `loadMessagesCmd` and `loadStatsCmd`. Both run concurrently and arrive as `messagesLoadedMsg` / `statsLoadedMsg`.
-5. Pressing `enter` on a session will launch `opencode --session <id>` in the current directory — **not yet implemented**.
+5. Pressing `enter` on a session launches `opencode --session <id>` in the current directory.
 
 ## Architecture
 
@@ -56,6 +58,8 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 | Add a new message type | `model.go` only |
 | Add a new display mode | `keys.go`, `model.go`, `update.go`, `view.go` |
 | Add a session or message field | `session.go` + `db.go` |
+| Change lint rules | `.golangci.yml` only |
+| Change editor conventions | `.editorconfig` only |
 
 ## Key conventions
 
@@ -66,3 +70,24 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 - `SessionStats` (message count, output tokens, context window size) is loaded asynchronously via `loadStatsCmd` in parallel with `loadMessagesCmd` whenever the cursor moves. The model field `stats *SessionStats` is `nil` while loading.
 - `renderPreview` computes `headerLines` dynamically from the rendered header string — do not use a hardcoded constant.
 - Update this file when adding new files, modes, or architectural patterns.
+
+## Tooling
+
+Run `make check` before committing — it runs `fmt`, `vet`, `lint`, and `test` in sequence.
+
+| Command | What it does |
+|---------|-------------|
+| `make fmt` | Formats all Go files with `gofmt` and `goimports` |
+| `make vet` | Runs `go vet ./...` |
+| `make lint` | Runs `golangci-lint run` (requires `golangci-lint` installed) |
+| `make test` | Runs `go test ./...` |
+| `make check` | Runs all of the above in order |
+
+Lint rules live in `.golangci.yml`. The active linters are `govet`, `staticcheck`, `errcheck`, `gosimple`, `unused`, `gofmt`, `goimports`, `misspell`, and `revive`. `revive` is configured without the exported-symbol doc-comment rule. To adjust linters or tweak rule severity, edit `.golangci.yml` only.
+
+Install required dev tools:
+
+```sh
+brew install golangci-lint
+go install golang.org/x/tools/cmd/goimports@latest
+```
