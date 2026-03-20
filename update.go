@@ -33,6 +33,28 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Tab):
 		m.mode = ModeWorkspaces
 		return m, nil
+
+	case key.Matches(msg, m.keys.Delete):
+		if len(m.filtered) == 0 {
+			return m, nil
+		}
+		id := m.filtered[m.cursor].ID
+
+		// Optimistic removal: strip the session from both slices immediately so
+		// the UI updates on this frame without waiting for the subprocess.
+		m.sessions = removeSessionByID(m.sessions, id)
+		m.filtered = removeSessionByID(m.filtered, id)
+		m.workspaces = buildWorkspaces(m.sessions)
+		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
+
+		var cmd tea.Cmd
+		if len(m.filtered) > 0 {
+			cmd = tea.Batch(m.loadMessagesForCursor(), m.deleteSessionCmd(id))
+		} else {
+			m.messages = nil
+			cmd = m.deleteSessionCmd(id)
+		}
+		return m, cmd
 	}
 
 	return m, nil
@@ -92,4 +114,15 @@ func (m *model) loadMessagesForCursor() tea.Cmd {
 	m.messages = nil
 	m.previewSessionID = id
 	return m.loadMessagesCmd(id)
+}
+
+// removeSessionByID returns a new slice with the session matching id removed.
+func removeSessionByID(sessions []Session, id string) []Session {
+	out := make([]Session, 0, len(sessions))
+	for _, s := range sessions {
+		if s.ID != id {
+			out = append(out, s)
+		}
+	}
+	return out
 }

@@ -180,7 +180,7 @@ func (m model) renderHint(width int) string {
 	case ModeWorkspaces:
 		hints = "  j/k: navigate   tab: sessions view   q: quit"
 	default:
-		hints = "  j/k: navigate   /: search   tab: workspaces   q: quit"
+		hints = "  j/k: navigate   /: search   d: delete   tab: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 

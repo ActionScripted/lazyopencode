@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -18,6 +19,9 @@ type messagesLoadedMsg struct {
 	sessionID string
 	messages  []Message
 }
+
+// sessionDeletedMsg signals that a session was successfully deleted.
+type sessionDeletedMsg struct{}
 
 // errMsg carries a non-fatal error to display in the UI.
 type errMsg struct {
@@ -79,6 +83,15 @@ func (m model) loadMessagesCmd(sessionID string) tea.Cmd {
 	}
 }
 
+func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
+			return errMsg{err: err}
+		}
+		return sessionDeletedMsg{}
+	}
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -108,9 +121,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case sessionDeletedMsg:
+		// Reload the full session list; the handler will re-derive everything.
+		return m, m.loadSessionsCmd()
+
 	case errMsg:
 		m.err = msg.err
-		return m, nil
+		return m, m.loadSessionsCmd()
 
 	case tea.KeyMsg:
 		switch m.mode {
