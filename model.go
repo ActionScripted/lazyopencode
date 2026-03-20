@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -31,6 +32,9 @@ type sessionDeletedMsg struct{}
 
 // sessionOpenedMsg signals that an opencode session subprocess has exited.
 type sessionOpenedMsg struct{}
+
+// yankDoneMsg signals that the yank command completed (success or silent failure).
+type yankDoneMsg struct{}
 
 // errMsg carries a non-fatal error to display in the UI.
 type errMsg struct {
@@ -116,6 +120,23 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 	})
 }
 
+// yankCmd copies text to the system clipboard using pbcopy (macOS) or
+// xclip (Linux). Fails silently — a missing clipboard tool is not fatal.
+func yankCmd(text string) tea.Cmd {
+	return func() tea.Msg {
+		var c *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			c = exec.Command("pbcopy")
+		default:
+			c = exec.Command("xclip", "-selection", "clipboard")
+		}
+		c.Stdin = strings.NewReader(text)
+		_ = c.Run() // silent on failure
+		return yankDoneMsg{}
+	}
+}
+
 func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 	return func() tea.Msg {
 		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
@@ -185,6 +206,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload sessions to pick up any changes made during the opencode session.
 		return m, m.loadSessionsCmd()
 
+	case yankDoneMsg:
+		// Nothing to do — clipboard write is fire-and-forget.
+		return m, nil
+
 	case errMsg:
 		m.err = msg.err
 		return m, m.loadSessionsCmd()
@@ -201,6 +226,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateConfirmDelete(msg)
 		case ModeConfirmDeleteWorkspace:
 			return m.updateConfirmDeleteWorkspace(msg)
+		case ModeYank:
+			return m.updateYank(msg)
 		}
 	}
 	return m, nil

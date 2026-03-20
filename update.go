@@ -44,6 +44,13 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeConfirmDelete
 		return m, nil
 
+	case key.Matches(msg, m.keys.Yank):
+		if len(m.filtered) == 0 {
+			return m, nil
+		}
+		m.mode = ModeYank
+		return m, nil
+
 	case key.Matches(msg, m.keys.Open):
 		if len(m.filtered) == 0 {
 			return m, nil
@@ -203,6 +210,33 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "n", "esc", "q", "ctrl+c":
 		m.pendingDeleteID = ""
+		m.mode = ModeNormal
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// updateYank handles key events while ModeYank is active.
+// d yanks the session's display directory; s yanks the session ID.
+// esc/q cancels back to normal mode.
+func (m model) updateYank(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if len(m.filtered) == 0 {
+		m.mode = ModeNormal
+		return m, nil
+	}
+	s := m.filtered[m.cursor]
+
+	switch {
+	case key.Matches(msg, m.keys.YankDirectory):
+		m.mode = ModeNormal
+		return m, yankCmd(s.DisplayDirectory())
+
+	case key.Matches(msg, m.keys.YankSession):
+		m.mode = ModeNormal
+		return m, yankCmd(s.ID)
+
+	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
 		m.mode = ModeNormal
 		return m, nil
 	}

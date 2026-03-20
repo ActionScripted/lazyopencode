@@ -11,18 +11,22 @@ const (
 	ModeWorkspaces
 	ModeConfirmDelete
 	ModeConfirmDeleteWorkspace
+	ModeYank
 )
 
 // KeyMap holds all named key bindings for the application.
 type KeyMap struct {
-	Up         key.Binding
-	Down       key.Binding
-	Search     key.Binding
-	Back       key.Binding
-	Quit       key.Binding
-	Workspaces key.Binding
-	Delete     key.Binding
-	Open       key.Binding
+	Up            key.Binding
+	Down          key.Binding
+	Search        key.Binding
+	Back          key.Binding
+	Quit          key.Binding
+	Workspaces    key.Binding
+	Delete        key.Binding
+	Open          key.Binding
+	Yank          key.Binding
+	YankDirectory key.Binding
+	YankSession   key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -59,6 +63,18 @@ func DefaultKeyMap() KeyMap {
 		Open: key.NewBinding(
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "open"),
+		),
+		Yank: key.NewBinding(
+			key.WithKeys("y"),
+			key.WithHelp("y", "yank"),
+		),
+		YankDirectory: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "yank directory"),
+		),
+		YankSession: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "yank session id"),
 		),
 	}
 }

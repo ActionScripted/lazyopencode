@@ -48,6 +48,10 @@ func (m model) View() string {
 		return overlayModal(base, m.renderSessionModal(), w, h)
 	}
 
+	if m.mode == ModeYank {
+		return overlayModal(base, m.renderYankModal(), w, h)
+	}
+
 	return base
 }
 
@@ -282,8 +286,10 @@ func (m model) renderHint(width int) string {
 		hints = "  j/k: navigate   w: sessions view   q: quit"
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		hints = "  Y/d: confirm delete   n/esc: cancel"
+	case ModeYank:
+		hints = "  d: yank directory   s: yank session id   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   dd: delete   w: workspaces   q: quit"
+		hints = "  j/k: navigate   enter: open   /: search   y: yank   dd: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 
@@ -456,6 +462,18 @@ func overlayModal(base, rendered string, w, h int) string {
 	}
 
 	return strings.Join(baseLines, "\n")
+}
+
+// renderYankModal returns the styled modal for the yank-to-clipboard prompt.
+func (m model) renderYankModal() string {
+	dKey := styleModalKeyYank.Render("d")
+	sKey := styleModalKeyYank.Render("s")
+
+	content := styleDim.Copy().Foreground(colorAccent).Bold(true).Render("Yank to clipboard") + "\n\n" +
+		dKey + styleDim.Render("  directory") + "\n" +
+		sKey + styleDim.Render("  session id")
+
+	return styleModalYank.Render(content)
 }
 
 // renderSessionModal returns the styled modal for a single-session delete.

@@ -91,6 +91,11 @@ var (
 			BorderForeground(colorDanger).
 			Padding(1, 3)
 
+	styleModalYank = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorAccent).
+			Padding(1, 3)
+
 	styleModalTitle = lipgloss.NewStyle().
 			Foreground(colorDanger).
 			Bold(true)
@@ -100,6 +105,12 @@ var (
 			Background(colorDanger).
 			Bold(true).
 			Padding(0, 1)
+
+	styleModalKeyYank = lipgloss.NewStyle().
+				Foreground(colorBg).
+				Background(colorAccent).
+				Bold(true).
+				Padding(0, 1)
 
 	styleModalKeyCancel = lipgloss.NewStyle().
 				Foreground(colorBg).
