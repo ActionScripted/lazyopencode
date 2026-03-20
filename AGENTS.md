@@ -15,8 +15,8 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 | File | Purpose |
 |------|---------|
 | `main.go` | Entry point; resolves the DB path and starts the Bubble Tea program |
-| `model.go` | App state (`model` struct), `Init`/`Update` logic, session filtering |
-| `view.go` | `View` function — renders the full TUI layout |
+| `model.go` | App state (`model` struct), `Init`/`Update` logic, session filtering, message types |
+| `view.go` | `View` function and pure render utilities (`formatRow`, `truncate`, etc.) |
 | `update.go` | Key handler helpers (`updateNormal`, `updateSearch`) |
 | `keys.go` | Key bindings and `Mode` enum (`ModeNormal`, `ModeSearch`) |
 | `session.go` | `Session` and `Message` types; display helpers |
@@ -29,10 +29,31 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 1. On startup, `loadSessions` queries `~/.local/share/opencode/opencode.db` (read-only).
 2. Sessions are displayed in a list; filtering happens in-memory via `filterSessions`.
 3. When a session is selected, `loadMessages` fetches its chat history for the preview pane.
-4. Pressing `enter` on a session launches `opencode --session <id>` in the current directory.
+4. Pressing `enter` on a session will launch `opencode --session <id>` in the current directory — **not yet implemented**.
+
+## Architecture
+
+The Bubble Tea Elm pattern is non-negotiable: **all state lives in `model`, all mutations happen in `Update`, `View` is pure.** Side effects (DB queries, process launches) happen exclusively inside `tea.Cmd` closures returned from `Update`. If you find yourself putting logic in `View` or mutating state outside of `Update`, you're doing it wrong.
+
+New async results use typed message structs (e.g. `type fooLoadedMsg struct { ... }`). All message types live in `model.go`. This keeps the full event surface of the app visible in one place.
+
+Styles are declared as package-level `var`s in `styles.go` and nowhere else. This means a theme change is a single-file edit. Don't declare styles inline or inside render functions.
+
+DB functions open their own connection, run their query, and close. SQLite read-only connections are cheap — a shared pool adds complexity with no real benefit here. Don't optimize this.
+
+## Where to make changes
+
+| If you want to… | Touch these files |
+|---|---|
+| Add a key binding | `keys.go` (define), `update.go` (handle) |
+| Add a new style or color | `styles.go` only |
+| Add a DB query | `db.go` only |
+| Add a new message type | `model.go` only |
+| Add a new display mode | `keys.go`, `model.go`, `update.go`, `view.go` |
+| Add a session or message field | `session.go` + `db.go` |
 
 ## Key conventions
 
 - All DB access is read-only (`?mode=ro`). A missing DB is treated as an empty state, not an error.
-- The Bubble Tea pattern is strict: state lives only in `model`, mutations happen in `Update`, rendering is pure in `View`.
 - No CGO — the sqlite driver is `modernc.org/sqlite`.
+- Update this file when adding new files, modes, or architectural patterns.

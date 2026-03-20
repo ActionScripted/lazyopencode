@@ -79,17 +79,7 @@ func (m model) renderList(width, height int) string {
 	}
 
 	for i := visibleStart; i < len(m.filtered) && i < visibleStart+height; i++ {
-		row := formatRow(m.filtered[i], width, pathColW)
-		pad := width - lipgloss.Width(row)
-		if pad < 0 {
-			pad = 0
-		}
-		row += strings.Repeat(" ", pad)
-		if i == m.cursor {
-			sb.WriteString(styleSelectedRow.Render(row) + "\n")
-		} else {
-			sb.WriteString(styleRow.Render(row) + "\n")
-		}
+		sb.WriteString(formatRow(m.filtered[i], width, pathColW, i == m.cursor) + "\n")
 	}
 
 	return sb.String()
@@ -208,15 +198,21 @@ func (m model) renderHint(width int) string {
 //
 // Layout (all widths in terminal columns):
 //
-//	" " date(16) "  " title(titleW) "  " path(pathColW) " "
+//	" " date(16) "  " title(titleW) "  " path(pathColW) " " trail
 //
 // pathColW is computed by the caller from the live session list so the column
 // is always as tight as possible and reflows when the search filter changes.
 //
+// selected controls whether the selection background is applied. It must be
+// passed here — not applied by the caller over the assembled string — because
+// termenv wraps every styled span with \e[0m (full reset), which would kill a
+// background applied by an outer Render call. Instead every span is styled
+// independently with the same background so no reset can break the highlight.
+//
 // All width arithmetic is performed on plain text before any style is applied.
-// That means adding bold or color to any cell later requires only wrapping the
-// already-padded plain string — the numbers never need to change.
-func formatRow(s Session, width, pathColW int) string {
+// Adding a new decoration to any cell later only requires touching that cell's
+// style call — the numbers never need to change.
+func formatRow(s Session, width, pathColW int, selected bool) string {
 	const (
 		leadSp  = 1  // single leading space
 		dateW   = 16 // "2006-01-02 15:04" is always exactly 16 columns
@@ -240,13 +236,29 @@ func formatRow(s Session, width, pathColW int) string {
 	paddedTitle := rawTitle + strings.Repeat(" ", titleW-lipgloss.Width(rawTitle))
 	// Path: right-aligned, space-padded on the left.
 	paddedPath := strings.Repeat(" ", pathColW-lipgloss.Width(rawPath)) + rawPath
+	// Trailing fill: keeps the background unbroken to the edge of the list pane.
+	assembled := leadSp + dateW + dateGap + titleW + minGap + pathColW + trailSp
+	trailFill := strings.Repeat(" ", max(0, width-assembled))
 
-	// ── apply styles to already-width-correct plain strings ───────────────────
-	// Only the path gets a color here; the row-level style (normal / selected)
-	// is applied by the caller over the entire row string.
-	coloredPath := styleListPath.Render(paddedPath)
+	// ── per-cell styles ───────────────────────────────────────────────────────
+	// Every span is styled independently and carries the background color (when
+	// selected). This is the key invariant: because termenv emits \e[0m after
+	// each span, an outer background Render would be killed by the first inner
+	// reset. By giving every span its own background we guarantee the highlight
+	// is unbroken across the full row width regardless of what other attributes
+	// (bold, color) individual cells carry.
+	base := lipgloss.NewStyle().Foreground(colorFg)
+	if selected {
+		base = base.Background(colorSelected)
+	}
 
-	return " " + date + "  " + paddedTitle + "  " + coloredPath + " "
+	styledLead := base.Render(strings.Repeat(" ", leadSp))
+	styledDate := base.Render(date + strings.Repeat(" ", dateGap))
+	styledTitle := base.Bold(true).Render(paddedTitle + strings.Repeat(" ", minGap))
+	styledPath := base.Foreground(colorAccent).Render(paddedPath)
+	styledTrail := base.Render(strings.Repeat(" ", trailSp) + trailFill)
+
+	return styledLead + styledDate + styledTitle + styledPath + styledTrail
 }
 
 // truncate clips s to at most maxW terminal columns. If the string is longer

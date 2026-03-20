@@ -25,12 +25,6 @@ var (
 	styleSeparator = lipgloss.NewStyle().
 			Foreground(colorBorder)
 
-	styleRow = lipgloss.NewStyle().
-			Foreground(colorFg)
-
-	styleSelectedRow = lipgloss.NewStyle().
-				Background(colorSelected)
-
 	// Preview
 	stylePreviewPane = lipgloss.NewStyle().
 				BorderStyle(lipgloss.NormalBorder()).
@@ -43,9 +37,6 @@ var (
 	stylePreviewTitle = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(colorFg)
-
-	styleListPath = lipgloss.NewStyle().
-			Foreground(colorAccent)
 
 	styleRoleUser = lipgloss.NewStyle().
 			Foreground(colorUser).
