@@ -21,6 +21,7 @@ type KeyMap struct {
 	Back   key.Binding
 	Quit   key.Binding
 	Tab    key.Binding
+	Delete key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -49,6 +50,10 @@ func DefaultKeyMap() KeyMap {
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "workspaces"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "delete"),
 		),
 	}
 }

@@ -44,6 +44,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
 		s.UpdatedAt = time.Unix(ms/1000, 0)
+		s.DisplayDir = displayDir(s.Directory)
+		s.ShortDir = shortDir(s.Directory)
 		sessions = append(sessions, s)
 	}
 	if err := rows.Err(); err != nil {

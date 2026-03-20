@@ -15,14 +15,16 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		prev := m.cursor
 		m.cursor = clamp(m.cursor-1, 0, len(m.filtered)-1)
 		if m.cursor != prev {
-			return m, m.loadMessagesForCursor()
+			m, cmd := m.loadMessagesForCursor()
+			return m, cmd
 		}
 
 	case key.Matches(msg, m.keys.Down):
 		prev := m.cursor
 		m.cursor = clamp(m.cursor+1, 0, len(m.filtered)-1)
 		if m.cursor != prev {
-			return m, m.loadMessagesForCursor()
+			m, cmd := m.loadMessagesForCursor()
+			return m, cmd
 		}
 
 	case key.Matches(msg, m.keys.Search):
@@ -34,7 +36,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeWorkspaces
 		return m, nil
 
-	case msg.String() == "d":
+	case key.Matches(msg, m.keys.Delete):
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
@@ -61,7 +63,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeNormal
 		return m, nil
 
-	case msg.String() == "d":
+	case key.Matches(msg, m.keys.Delete):
 		if len(m.workspaces) == 0 {
 			return m, nil
 		}
@@ -92,22 +94,23 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// If the selected session changed due to filtering, reload messages.
 	if len(m.filtered) > 0 && m.filtered[m.cursor].ID != prevID {
-		return m, tea.Batch(cmd, m.loadMessagesForCursor())
+		m, loadCmd := m.loadMessagesForCursor()
+		return m, tea.Batch(cmd, loadCmd)
 	}
 
 	return m, cmd
 }
 
-// loadMessagesForCursor fires a loadMessagesCmd for the currently selected
-// session and clears the cached messages so the preview shows "loading…".
-func (m *model) loadMessagesForCursor() tea.Cmd {
+// loadMessagesForCursor returns an updated model with messages cleared and a
+// command to load messages for the currently selected session.
+func (m model) loadMessagesForCursor() (model, tea.Cmd) {
 	if len(m.filtered) == 0 {
-		return nil
+		return m, nil
 	}
 	id := m.filtered[m.cursor].ID
 	m.messages = nil
 	m.previewSessionID = id
-	return m.loadMessagesCmd(id)
+	return m, m.loadMessagesCmd(id)
 }
 
 // removeSessionByID returns a new slice with the session matching id removed.
@@ -163,6 +166,7 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 
 	return m, nil
 }
+
 func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "d":
@@ -182,11 +186,11 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		var cmd tea.Cmd
 		if len(m.filtered) > 0 {
-			cmd = tea.Batch(m.loadMessagesForCursor(), m.deleteSessionCmd(id))
-		} else {
-			m.messages = nil
-			cmd = m.deleteSessionCmd(id)
+			m, loadCmd := m.loadMessagesForCursor()
+			return m, tea.Batch(loadCmd, m.deleteSessionCmd(id))
 		}
+		m.messages = nil
+		cmd = m.deleteSessionCmd(id)
 		return m, cmd
 
 	case "n", "esc", "q", "ctrl+c":

@@ -9,10 +9,12 @@ import (
 
 // Session represents a single opencode session.
 type Session struct {
-	ID        string
-	Title     string
-	Directory string
-	UpdatedAt time.Time
+	ID         string
+	Title      string
+	Directory  string
+	UpdatedAt  time.Time
+	DisplayDir string // Directory with home replaced by "~"; computed at load time
+	ShortDir   string // Last path component (or "~"); computed at load time
 }
 
 // Message represents a single chat message in a session.
@@ -27,23 +29,29 @@ func (s Session) FilterValue() string {
 	return s.Title + " " + s.Directory
 }
 
-// DisplayDirectory replaces the home directory with ~ for display.
+// DisplayDirectory returns the pre-computed display path (home replaced by "~").
 func (s Session) DisplayDirectory() string {
-	return displayDir(s.Directory)
+	return s.DisplayDir
+}
+
+// ShortDirectory returns the pre-computed short path (last component, or "~").
+func (s Session) ShortDirectory() string {
+	return s.ShortDir
 }
 
 // displayDir replaces the home directory prefix with "~" in the given path.
+// Called once at load time to populate Session.DisplayDir.
 func displayDir(dir string) string {
 	home, _ := os.UserHomeDir()
 	return strings.Replace(dir, home, "~", 1)
 }
 
-// ShortDirectory returns just the last path component (project folder name).
-// Returns "~" if the directory is the user's home directory.
-func (s Session) ShortDirectory() string {
+// shortDir returns just the last path component of dir, or "~" if dir is the
+// user's home directory. Called once at load time to populate Session.ShortDir.
+func shortDir(dir string) string {
 	home, _ := os.UserHomeDir()
-	if s.Directory == home {
+	if dir == home {
 		return "~"
 	}
-	return filepath.Base(s.Directory)
+	return filepath.Base(dir)
 }

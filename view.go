@@ -192,9 +192,7 @@ func (m model) renderHint(width int) string {
 		hints = "  enter/esc: back   type to filter"
 	case ModeWorkspaces:
 		hints = "  j/k: navigate   tab: sessions view   q: quit"
-	case ModeConfirmDelete:
-		hints = "  Y/d: confirm delete   n/esc: cancel"
-	case ModeConfirmDeleteWorkspace:
+	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		hints = "  Y/d: confirm delete   n/esc: cancel"
 	default:
 		hints = "  j/k: navigate   /: search   dd: delete   tab: workspaces   q: quit"
@@ -207,9 +205,7 @@ func (m model) renderHint(width int) string {
 		badge = styleModeSearch.Render("SEARCH")
 	case ModeWorkspaces:
 		badge = styleModeWorkspaces.Render("WORKSPACES")
-	case ModeConfirmDelete:
-		badge = styleModeConfirmDelete.Render("DELETE?")
-	case ModeConfirmDeleteWorkspace:
+	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		badge = styleModeConfirmDelete.Render("DELETE?")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
