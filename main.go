@@ -15,11 +15,11 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stdout, "Usage: lazyopencode [flags]\n\n")
-		fmt.Fprintf(os.Stdout, "A terminal UI for browsing and managing opencode sessions.\n\n")
-		fmt.Fprintf(os.Stdout, "Flags:\n")
-		fmt.Fprintf(os.Stdout, "  -help       show this help message\n")
-		fmt.Fprintf(os.Stdout, "  -version    print version and exit\n")
+		w := flag.CommandLine.Output()
+		fmt.Fprintf(w, "Usage: lazyopencode [flags]\n\n")                                //nolint:errcheck
+		fmt.Fprintf(w, "A terminal UI for browsing and managing opencode sessions.\n\n") //nolint:errcheck
+		fmt.Fprintf(w, "Flags:\n")                                                       //nolint:errcheck
+		flag.PrintDefaults()
 	}
 
 	flag.Parse()
