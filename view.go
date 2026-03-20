@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -114,28 +115,89 @@ func (m model) renderPreview(width, height int) string {
 	s := m.filtered[m.cursor]
 
 	// ── header ────────────────────────────────────────────────────────────────
+	const labelW = 9 // "messages " — widest label + 1 space
+
+	metaLabel := func(l string) string {
+		return styleDim.Render(l + strings.Repeat(" ", labelW-len(l)))
+	}
+
 	var header strings.Builder
+
+	// title
 	header.WriteString(stylePreviewTitle.Render(
 		lipgloss.NewStyle().MaxWidth(inner).Render(s.Title),
 	))
 	header.WriteString("\n\n")
-	header.WriteString(styleDim.Render("path     ") + styleAccent.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(s.DisplayDirectory()),
+
+	// path
+	header.WriteString(metaLabel("path"))
+	header.WriteString(styleAccent.Render(
+		lipgloss.NewStyle().MaxWidth(inner - labelW).Render(s.DisplayDirectory()),
 	))
 	header.WriteString("\n")
-	header.WriteString(styleDim.Render("updated  ") + s.UpdatedAt.Format("2006-01-02 15:04"))
-	header.WriteString("\n\n")
-	separator := styleDim.Render("─── messages " + strings.Repeat("─", max(0, inner-13)))
-	header.WriteString(separator)
 
-	// header occupies: title(1) + blank(1) + dir(1) + updated(1) + blank(1) + separator(1) = 6 lines
-	const headerLines = 6
+	// created
+	header.WriteString(metaLabel("created"))
+	header.WriteString(s.CreatedAt.Format("2006-01-02 15:04"))
+	header.WriteString("\n")
+
+	// updated
+	header.WriteString(metaLabel("updated"))
+	header.WriteString(s.UpdatedAt.Format("2006-01-02 15:04"))
+	header.WriteString("\n")
+
+	// duration
+	header.WriteString(metaLabel("duration"))
+	header.WriteString(formatDuration(s.UpdatedAt.Sub(s.CreatedAt)))
+	header.WriteString("\n")
+
+	// stats (async — show loading until statsLoadedMsg arrives)
+	if m.stats == nil {
+		header.WriteString(styleDim.Render("  loading stats…"))
+		header.WriteString("\n")
+	} else {
+		st := m.stats
+
+		// messages
+		header.WriteString(metaLabel("messages"))
+		header.WriteString(fmt.Sprintf("%d", st.MsgCount))
+		header.WriteString("\n")
+
+		// context + output tokens (only when AI turns exist)
+		if st.ContextTokens > 0 {
+			header.WriteString(metaLabel("context"))
+			header.WriteString(formatTokens(st.ContextTokens))
+			header.WriteString("\n")
+
+			header.WriteString(metaLabel("output"))
+			header.WriteString(formatTokens(st.OutputTokens))
+			header.WriteString("\n")
+		}
+
+		// changes (only when files were modified)
+		if s.SummaryFiles > 0 {
+			header.WriteString(metaLabel("changes"))
+			header.WriteString(fmt.Sprintf("%d files (", s.SummaryFiles))
+			header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
+			header.WriteString(" ")
+			header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
+			header.WriteString(")")
+			header.WriteString("\n")
+		}
+	}
+
+	// separator
+	header.WriteString("\n")
+	header.WriteString(styleDim.Render("─── messages " + strings.Repeat("─", max(0, inner-13))))
+
+	// ── messages ──────────────────────────────────────────────────────────────
+	// Compute header height dynamically so it never drifts out of sync.
+	headerLines := strings.Count(header.String(), "\n") + 1
 	msgHeight := height - headerLines
 	if msgHeight < 1 {
 		msgHeight = 1
 	}
 
-	// ── messages ──────────────────────────────────────────────────────────────
 	var msgSection string
 	switch {
 	case m.messages == nil:
@@ -145,7 +207,6 @@ func (m model) renderPreview(width, height int) string {
 		msgSection = "\n" + styleDim.Render("  no messages")
 
 	default:
-		// Render each message into a block, then fill from the bottom up.
 		blocks := make([]string, len(m.messages))
 		for i, msg := range m.messages {
 			var label string
@@ -158,12 +219,10 @@ func (m model) renderPreview(width, height int) string {
 			blocks[i] = label + "\n" + wrapped
 		}
 
-		// Walk backwards, accumulate blocks that fit.
-		// Each block costs: lines(block) + 1 blank separator.
 		used := 0
 		first := len(blocks)
 		for i := len(blocks) - 1; i >= 0; i-- {
-			cost := strings.Count(blocks[i], "\n") + 1 + 1 // block lines + blank
+			cost := strings.Count(blocks[i], "\n") + 1 + 1
 			if used+cost > msgHeight {
 				break
 			}
@@ -183,6 +242,35 @@ func (m model) renderPreview(width, height int) string {
 	return stylePreviewPane.Width(width - 2).Height(height).Render(header.String() + msgSection)
 }
 
+// formatDuration formats a duration for display in the preview header.
+// Sub-minute durations show as "< 1m"; otherwise "Xh Ym" or "Ym".
+func formatDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	if d < time.Minute {
+		return "< 1m"
+	}
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	return fmt.Sprintf("%dm", m)
+}
+
+// formatTokens formats a token count with K/M suffix.
+func formatTokens(n int) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fK", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
+}
+
 func (m model) renderHint(width int) string {
 	appName := styleDim.Render(" Lazy") + styleDim.Copy().Bold(true).Render("OpenCode")
 
@@ -191,11 +279,11 @@ func (m model) renderHint(width int) string {
 	case ModeSearch:
 		hints = "  enter/esc: back   type to filter"
 	case ModeWorkspaces:
-		hints = "  j/k: navigate   tab: sessions view   q: quit"
+		hints = "  j/k: navigate   w: sessions view   q: quit"
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
 		hints = "  Y/d: confirm delete   n/esc: cancel"
 	default:
-		hints = "  j/k: navigate   /: search   dd: delete   tab: workspaces   q: quit"
+		hints = "  j/k: navigate   /: search   dd: delete   w: workspaces   q: quit"
 	}
 	left := appName + styleDim.Render(hints)
 

@@ -12,9 +12,23 @@ type Session struct {
 	ID         string
 	Title      string
 	Directory  string
+	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DisplayDir string // Directory with home replaced by "~"; computed at load time
 	ShortDir   string // Last path component (or "~"); computed at load time
+
+	// Summary fields from the session row; zero for pure-chat sessions.
+	SummaryFiles     int
+	SummaryAdditions int
+	SummaryDeletions int
+}
+
+// SessionStats holds per-session aggregates fetched asynchronously from the
+// part table. Loaded in parallel with messages whenever the cursor moves.
+type SessionStats struct {
+	MsgCount      int
+	OutputTokens  int // sum of tokens.output across all step-finish parts
+	ContextTokens int // tokens.total from the last step-finish part (0 if none)
 }
 
 // Message represents a single chat message in a session.

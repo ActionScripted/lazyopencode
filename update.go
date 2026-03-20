@@ -32,7 +32,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.search.Focus()
 		return m, textinput.Blink
 
-	case key.Matches(msg, m.keys.Tab):
+	case key.Matches(msg, m.keys.Workspaces):
 		m.mode = ModeWorkspaces
 		return m, nil
 
@@ -59,7 +59,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Down):
 		m.workspaceCursor = clamp(m.workspaceCursor+1, 0, len(m.workspaces)-1)
 
-	case key.Matches(msg, m.keys.Tab):
+	case key.Matches(msg, m.keys.Workspaces):
 		m.mode = ModeNormal
 		return m, nil
 
@@ -101,16 +101,17 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// loadMessagesForCursor returns an updated model with messages cleared and a
-// command to load messages for the currently selected session.
+// loadMessagesForCursor returns an updated model with messages and stats
+// cleared, plus a batched command to reload both for the selected session.
 func (m model) loadMessagesForCursor() (model, tea.Cmd) {
 	if len(m.filtered) == 0 {
 		return m, nil
 	}
 	id := m.filtered[m.cursor].ID
 	m.messages = nil
+	m.stats = nil
 	m.previewSessionID = id
-	return m, m.loadMessagesCmd(id)
+	return m, tea.Batch(m.loadMessagesCmd(id), m.loadStatsCmd(id))
 }
 
 // removeSessionByID returns a new slice with the session matching id removed.

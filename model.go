@@ -20,6 +20,12 @@ type messagesLoadedMsg struct {
 	messages  []Message
 }
 
+// statsLoadedMsg carries aggregated stats for a specific session.
+type statsLoadedMsg struct {
+	sessionID string
+	stats     SessionStats
+}
+
 // sessionDeletedMsg signals that a session was successfully deleted.
 type sessionDeletedMsg struct{}
 
@@ -39,12 +45,13 @@ type model struct {
 	height                 int
 	dbPath                 string
 	err                    error
-	messages               []Message // messages for currently selected session; nil = loading
-	previewSessionID       string    // session ID whose messages are loaded
-	workspaces             []string  // sorted unique workspace directories
-	workspaceCursor        int       // cursor into workspaces slice
-	pendingDeleteID        string    // session ID awaiting delete confirmation
-	pendingDeleteWorkspace string    // workspace directory awaiting delete confirmation
+	messages               []Message     // messages for currently selected session; nil = loading
+	stats                  *SessionStats // stats for currently selected session; nil = loading
+	previewSessionID       string        // session ID whose messages are loaded
+	workspaces             []string      // sorted unique workspace directories
+	workspaceCursor        int           // cursor into workspaces slice
+	pendingDeleteID        string        // session ID awaiting delete confirmation
+	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
 }
 
 func newModel(dbPath string) model {
@@ -82,6 +89,17 @@ func (m model) loadMessagesCmd(sessionID string) tea.Cmd {
 			return messagesLoadedMsg{sessionID: sessionID, messages: []Message{}}
 		}
 		return messagesLoadedMsg{sessionID: sessionID, messages: messages}
+	}
+}
+
+func (m model) loadStatsCmd(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		stats, err := loadStats(m.dbPath, sessionID)
+		if err != nil {
+			// Non-fatal: show zero stats rather than an error.
+			return statsLoadedMsg{sessionID: sessionID, stats: SessionStats{}}
+		}
+		return statsLoadedMsg{sessionID: sessionID, stats: stats}
 	}
 }
 
@@ -125,7 +143,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			id := m.filtered[0].ID
 			m.previewSessionID = id
 			m.messages = nil
-			return m, m.loadMessagesCmd(id)
+			m.stats = nil
+			return m, tea.Batch(m.loadMessagesCmd(id), m.loadStatsCmd(id))
 		}
 		return m, nil
 
@@ -137,9 +156,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case statsLoadedMsg:
+		// Discard if the user has already moved to a different session.
+		if len(m.filtered) > 0 && msg.sessionID == m.filtered[m.cursor].ID {
+			stats := msg.stats
+			m.stats = &stats
+		}
+		return m, nil
+
 	case sessionDeletedMsg:
-		// Reload the full session list; the handler will re-derive everything.
-		return m, m.loadSessionsCmd()
+		// Optimistic removal already applied at confirm time; nothing to reload.
+		return m, nil
 
 	case errMsg:
 		m.err = msg.err

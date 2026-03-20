@@ -26,7 +26,11 @@ func loadSessions(dbPath string) ([]Session, error) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, title, directory, time_updated
+		SELECT id, title, directory,
+		       time_created, time_updated,
+		       COALESCE(summary_files, 0),
+		       COALESCE(summary_additions, 0),
+		       COALESCE(summary_deletions, 0)
 		FROM session
 		WHERE parent_id IS NULL
 		ORDER BY time_updated DESC
@@ -39,11 +43,16 @@ func loadSessions(dbPath string) ([]Session, error) {
 	var sessions []Session
 	for rows.Next() {
 		var s Session
-		var ms int64
-		if err := rows.Scan(&s.ID, &s.Title, &s.Directory, &ms); err != nil {
+		var createdMS, updatedMS int64
+		if err := rows.Scan(
+			&s.ID, &s.Title, &s.Directory,
+			&createdMS, &updatedMS,
+			&s.SummaryFiles, &s.SummaryAdditions, &s.SummaryDeletions,
+		); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
-		s.UpdatedAt = time.Unix(ms/1000, 0)
+		s.CreatedAt = time.Unix(createdMS/1000, 0)
+		s.UpdatedAt = time.Unix(updatedMS/1000, 0)
 		s.DisplayDir = displayDir(s.Directory)
 		s.ShortDir = shortDir(s.Directory)
 		sessions = append(sessions, s)
@@ -97,4 +106,59 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	}
 
 	return messages, nil
+}
+
+// loadStats returns aggregated statistics for a single session by querying the
+// part table. Two correlated subqueries keep it to a single round-trip:
+//   - output_tokens: sum of tokens.output across all step-finish parts
+//   - context_tokens: tokens.total from the most recent step-finish part
+//
+// Returns a zero-value SessionStats (not an error) if no step-finish parts
+// exist (pure chat sessions with no model calls).
+func loadStats(dbPath, sessionID string) (SessionStats, error) {
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	if err != nil {
+		return SessionStats{}, fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		return SessionStats{}, nil
+	}
+
+	var stats SessionStats
+	var outputTokens, contextTokens *int // nullable — NULL when no step-finish parts
+
+	err = db.QueryRow(`
+		SELECT
+		    COUNT(DISTINCT m.id),
+		    (
+		        SELECT SUM(json_extract(p2.data, '$.tokens.output'))
+		        FROM part p2
+		        WHERE p2.session_id = ?
+		          AND json_extract(p2.data, '$.type') = 'step-finish'
+		    ),
+		    (
+		        SELECT json_extract(p3.data, '$.tokens.total')
+		        FROM part p3
+		        WHERE p3.session_id = ?
+		          AND json_extract(p3.data, '$.type') = 'step-finish'
+		        ORDER BY p3.time_created DESC
+		        LIMIT 1
+		    )
+		FROM message m
+		WHERE m.session_id = ?
+	`, sessionID, sessionID, sessionID).Scan(&stats.MsgCount, &outputTokens, &contextTokens)
+	if err != nil {
+		return SessionStats{}, fmt.Errorf("query stats: %w", err)
+	}
+
+	if outputTokens != nil {
+		stats.OutputTokens = *outputTokens
+	}
+	if contextTokens != nil {
+		stats.ContextTokens = *contextTokens
+	}
+
+	return stats, nil
 }

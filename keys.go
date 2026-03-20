@@ -15,13 +15,13 @@ const (
 
 // KeyMap holds all named key bindings for the application.
 type KeyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Search key.Binding
-	Back   key.Binding
-	Quit   key.Binding
-	Tab    key.Binding
-	Delete key.Binding
+	Up         key.Binding
+	Down       key.Binding
+	Search     key.Binding
+	Back       key.Binding
+	Quit       key.Binding
+	Workspaces key.Binding
+	Delete     key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -47,9 +47,9 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
 		),
-		Tab: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "workspaces"),
+		Workspaces: key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "workspaces"),
 		),
 		Delete: key.NewBinding(
 			key.WithKeys("d"),

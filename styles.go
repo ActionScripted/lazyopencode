@@ -49,6 +49,10 @@ var (
 				Foreground(colorAssistant).
 				Bold(true)
 
+	// Diff additions/deletions in the preview header
+	styleAdd = lipgloss.NewStyle().Foreground(colorAssistant) // green
+	styleDel = lipgloss.NewStyle().Foreground(colorDanger)    // red
+
 	// Hint bar
 	styleHint = lipgloss.NewStyle().
 			Foreground(colorDim).

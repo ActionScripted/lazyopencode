@@ -27,9 +27,9 @@ lazyoc is a terminal UI (TUI) for managing [opencode](https://opencode.ai) sessi
 ## Data flow
 
 1. On startup, `loadSessions` queries `~/.local/share/opencode/opencode.db` (read-only).
-2. `Session.DisplayDir` and `Session.ShortDir` are computed once at load time in `db.go` — not on every render call.
+2. `Session.DisplayDir`, `Session.ShortDir`, `Session.CreatedAt`, and the `Summary*` fields are computed/populated once at load time in `db.go` — not on every render call.
 3. Sessions are displayed in a list; filtering happens in-memory via `filterSessions`.
-4. When a session is selected, `loadMessages` fetches its chat history for the preview pane.
+4. When a session is selected, `loadMessagesForCursor` fires a `tea.Batch` of two commands: `loadMessagesCmd` and `loadStatsCmd`. Both run concurrently and arrive as `messagesLoadedMsg` / `statsLoadedMsg`.
 5. Pressing `enter` on a session will launch `opencode --session <id>` in the current directory — **not yet implemented**.
 
 ## Architecture
@@ -62,5 +62,7 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 - All DB access is read-only (`?mode=ro`). A missing DB is treated as an empty state, not an error.
 - No CGO — the sqlite driver is `modernc.org/sqlite`.
 - All key bindings go through `key.Binding` in `KeyMap`. Never match keys with raw `msg.String() ==` comparisons.
-- `Session.DisplayDir` and `Session.ShortDir` are pre-computed at load time. Do not call `os.UserHomeDir` in render paths.
+- `Session.DisplayDir`, `Session.ShortDir`, `Session.CreatedAt`, and `Session.Summary*` fields are pre-computed at load time. Do not call `os.UserHomeDir` in render paths.
+- `SessionStats` (message count, output tokens, context window size) is loaded asynchronously via `loadStatsCmd` in parallel with `loadMessagesCmd` whenever the cursor moves. The model field `stats *SessionStats` is `nil` while loading.
+- `renderPreview` computes `headerLines` dynamically from the rendered header string — do not use a hardcoded constant.
 - Update this file when adding new files, modes, or architectural patterns.
