@@ -290,33 +290,14 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	return styledLead + styledDate + styledTitle + styledPath + styledTrail
 }
 
-// truncate clips s to at most maxW terminal columns. If the string is longer
-// it is cut and a single "…" character (1 column) is appended.
-//
-// IMPORTANT: only call this on plain text — never on a string that already
-// contains ANSI escape sequences. Width measurements on pre-styled strings
-// must use lipgloss.Width(), not this function.
+// truncate clips s to at most maxW terminal columns, appending "…" if the
+// string is longer. Delegates to ansi.Truncate which is ANSI-safe and
+// grapheme-cluster-aware.
 func truncate(s string, maxW int) string {
 	if maxW <= 0 {
 		return ""
 	}
-	if lipgloss.Width(s) <= maxW {
-		return s
-	}
-	// Reserve 1 column for the ellipsis character.
-	var (
-		out  []rune
-		used = 1 // 1 column reserved for "…"
-	)
-	for _, r := range s {
-		rw := lipgloss.Width(string(r))
-		if used+rw > maxW {
-			break
-		}
-		out = append(out, r)
-		used += rw
-	}
-	return string(out) + "…"
+	return ansi.Truncate(s, maxW, "…")
 }
 
 // overlayModal centers a pre-rendered modal string over the base view.
