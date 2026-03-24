@@ -34,8 +34,8 @@ func (m model) View() string {
 	}
 	listW := w - previewW
 
-	// hint bar occupies 2 rows (border + text)
-	// search + separator occupy 2 rows
+	// hint bar occupies 2 rows (border + text) in wide mode,
+	// or 2 rows (hints + logo) in narrow mode (w < 182).
 	list := styleListPane.Width(listW).Height(h - 2).Render(m.renderList(listW, h-4))
 	preview := m.renderPreview(previewW, h-2)
 
@@ -317,15 +317,15 @@ func (m model) renderHint(width int) string {
 	case ModeSearch:
 		hints = "  enter/esc: back   type to filter"
 	case ModeWorkspaces:
-		hints = "  j/k: navigate   d: delete   w: toggle workspace   q: quit"
+		hints = "  j/k: up/down   d: del   w: workspace   q: quit"
 	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
-		hints = "  y/d: confirm delete   n/esc: cancel"
+		hints = "  y/d: confirm   n/esc: cancel"
 	case ModeYank:
-		hints = "  d: yank directory   s: yank session id   esc: cancel"
+		hints = "  d: directory   s: session id   esc: cancel"
 	case ModeGotoMenu:
-		hints = "  s: shell   w: toggle workspace   esc: cancel"
+		hints = "  s: shell   w: workspace   esc: cancel"
 	default:
-		hints = "  j/k: navigate   enter: open   /: search   y: yank   g: go to   d: delete   w: toggle workspace   q: quit"
+		hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
 	}
 	dots := "  " +
 		lipgloss.NewStyle().Foreground(colorBlue).Render("•") +
@@ -333,7 +333,6 @@ func (m model) renderHint(width int) string {
 		lipgloss.NewStyle().Foreground(colorCyan).Render("•") +
 		" " +
 		lipgloss.NewStyle().Foreground(colorYellow).Render("•")
-	left := appName + dots + renderHintSegments(hints)
 
 	var badge string
 	switch m.mode {
@@ -351,6 +350,19 @@ func (m model) renderHint(width int) string {
 		badge = styleModeNormal.Render("NORMAL")
 	}
 
+	if width < 182 {
+		// Narrow layout: hints on top (with border), logo + mode badge below.
+		hintLine := styleHint.Width(width - 1).Render(renderHintSegments(hints))
+		logo := appName + dots
+		space := width - 1 - lipgloss.Width(logo) - lipgloss.Width(badge)
+		if space < 1 {
+			space = 1
+		}
+		logoLine := styleHint.UnsetBorderTop().Width(width - 1).Render(logo + strings.Repeat(" ", space) + badge)
+		return hintLine + "\n" + logoLine
+	}
+
+	left := appName + dots + renderHintSegments(hints)
 	space := width - 1 - lipgloss.Width(left) - lipgloss.Width(badge)
 	if space < 1 {
 		space = 1
@@ -592,7 +604,7 @@ func (m model) renderWorkspaceModal() string {
 // Left pane: navigable list of unique workspace directories.
 // Right pane: read-only list of sessions belonging to the selected workspace.
 func (m model) renderWorkspacesView(w, h int) string {
-	// hint bar: 2 rows (border + text); pane body gets the rest.
+	// hint bar: 2 rows in both wide and narrow modes; pane body gets the rest.
 	bodyH := h - 2
 
 	rightW := w * 55 / 100
