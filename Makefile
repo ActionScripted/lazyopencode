@@ -2,7 +2,7 @@ BINARY  := build/lazyopencode
 LINK    := $(HOME)/.local/bin/lazyopencode
 SRC     := $(wildcard *.go)
 
-.PHONY: build link install clean fmt vet lint test check
+.PHONY: build link install clean fmt vet lint test check release
 
 build: $(SRC)
 	@mkdir -p build
@@ -33,3 +33,16 @@ test:
 	go test ./...
 
 check: fmt vet lint test
+
+release: check
+	@latest=$$(git tag --sort=-v:refname | head -1); \
+	suggested=$$(echo $$latest | awk -F. '{$$NF=$$NF+1; print $$0}' OFS=.); \
+	printf "Latest tag: $$latest\nNew tag [$$suggested]: "; \
+	read input; \
+	new=$${input:-$$suggested}; \
+	printf "Tag $$new — push? [y/N]: "; \
+	read confirm; \
+	case $$confirm in \
+		[yY]) git tag $$new && git push origin $$new ;; \
+		*) echo "Aborted." ;; \
+	esac
