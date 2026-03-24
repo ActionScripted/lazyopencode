@@ -93,7 +93,11 @@ func (m model) renderList(width, height int) string {
 	// Compute the path column width from the visible session set so the column
 	// stays as tight as possible and reflows correctly when the search filter
 	// changes.
-	const maxPathW = 30
+	// Cap is tighter on narrower list panes (< 120 cols).
+	maxPathW := 30
+	if width < 120 {
+		maxPathW = 20
+	}
 	pathColW := 0
 	for _, s := range m.filtered {
 		if n := lipgloss.Width(s.ShortDirectory()); n > pathColW {
@@ -391,25 +395,37 @@ func (m model) renderHint(width int) string {
 // style call — the numbers never need to change.
 func formatRow(s Session, width, pathColW int, selected bool) string {
 	const (
-		leadSp  = 1  // single leading space
-		dateW   = 16 // "2006-01-02 15:04" is always exactly 16 columns
-		dateGap = 2  // spaces between date and title
-		minGap  = 2  // minimum spaces between title and path
-		trailSp = 1  // single trailing space
+		leadSp     = 1  // single leading space
+		dateWFull  = 16 // "2006-01-02 15:04" is always exactly 16 columns
+		dateWShort = 6  // "Jan 02" is always exactly 6 columns
+		dateGap    = 2  // spaces between date and title
+		minGap     = 2  // minimum spaces between title and path
+		trailSp    = 1  // single trailing space
 	)
 
-	// Responsive column hiding: hide date below 100 cols, hide path below 77.
-	showDate := width >= 100
-	showPath := width >= 77
+	// Responsive column hiding/shortening:
+	//   >= 120: full date "2006-01-02 15:04"
+	//   >= 80:  short date "Jan 02"
+	//   <  80:  no date
+	//   >= 77:  path column shown
+	showDateFull := width >= 120
+	showDateShort := width >= 80 && !showDateFull
+	showDate := showDateFull || showDateShort
+	showPath := width >= 80
 
-	effectiveDateW := dateW
-	effectiveDateGap := dateGap
+	effectiveDateW := 0
+	effectiveDateGap := 0
+	switch {
+	case showDateFull:
+		effectiveDateW = dateWFull
+		effectiveDateGap = dateGap
+	case showDateShort:
+		effectiveDateW = dateWShort
+		effectiveDateGap = dateGap
+	}
+
 	effectiveMinGap := minGap
 	effectivePathW := pathColW
-	if !showDate {
-		effectiveDateW = 0
-		effectiveDateGap = 0
-	}
 	if !showPath {
 		effectiveMinGap = 0
 		effectivePathW = 0
@@ -421,7 +437,13 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	}
 
 	// ── plain-text content, truncated to column widths ────────────────────────
-	date := s.UpdatedAt.Format("2006-01-02 15:04") // always exactly dateW columns
+	var date string
+	switch {
+	case showDateFull:
+		date = s.UpdatedAt.Format("2006-01-02 15:04")
+	case showDateShort:
+		date = s.UpdatedAt.Format("Jan 02")
+	}
 	rawTitle := truncate(s.Title, titleW)
 	rawPath := truncate(s.ShortDirectory(), effectivePathW)
 
@@ -452,7 +474,7 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 
 	row := styledLead
 	if showDate {
-		row += base.Foreground(colorDim).Render(date + strings.Repeat(" ", dateGap))
+		row += base.Foreground(colorDim).Render(date + strings.Repeat(" ", effectiveDateGap))
 	}
 	row += styledTitle
 	if showPath {
