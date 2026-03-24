@@ -35,6 +35,10 @@ const (
 	// mode; below this threshold the preview is dropped entirely.
 	minStackedBodyH = 24
 
+	// Top border bar — a single row rendered at the very top of the viewport so
+	// content is not clipped by window chrome (titlebars, tab bars, etc.).
+	topBarH = 1
+
 	// Hint bar.
 	hintBarWidthAdj = 1 // intentional 1-col right margin for badge placement; borders still extend to full width
 
@@ -62,19 +66,19 @@ const (
 	paneVertBorderStacked = 1 // top border row cost (stacked mode)
 
 	// Path column caps in renderList.
-	maxPathWWide   = 30
-	maxPathWNarrow = 20
+	maxPathWidthWide   = 30
+	maxPathWidthNarrow = 20
 
 	// Modal inner content width (max chars for a title inside a delete modal).
-	modalInnerW = 46
+	modalInnerWidth = 46
 
 	// Minimum right-pane width in the workspaces view.
-	workspacesRightMinW = 30
+	workspacesRightMinWidth = 30
 
-	// Date/time column widths (shared by formatRow and formatWorkspaceSessionRow).
-	dateWFull  = 16 // "2006-01-02 15:04" — always exactly 16 columns
-	dateWShort = 6  // "Jan 02"            — always exactly 6 columns
-	dateGap    = 2  // spaces between the date column and the title column
+	// Date/time column widths (shared by formatSessionRow and formatWorkspaceSessionRow).
+	dateFullWidth  = 16 // "2006-01-02 15:04" — always exactly 16 columns
+	dateShortWidth = 6  // "Jan 02"            — always exactly 6 columns
+	dateGap        = 2  // spaces between the date column and the title column
 )
 
 func (m model) View() string {
@@ -95,6 +99,9 @@ func (m model) View() string {
 		base := m.renderWorkspacesView(w, h)
 		return overlayModal(base, m.renderWorkspaceModal(), w, h)
 	}
+
+	topBar := renderTopBar(w)
+	h -= topBarH
 
 	previewW := w * previewWidthPct / 100
 	listW := w - previewW
@@ -139,7 +146,7 @@ func (m model) View() string {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	}
 
-	base := body + "\n" + hint
+	base := topBar + "\n" + body + "\n" + hint
 
 	if m.mode == ModeConfirmDelete {
 		return overlayModal(base, m.renderSessionModal(), w, h)
@@ -149,7 +156,7 @@ func (m model) View() string {
 		return overlayModal(base, m.renderYankModal(), w, h)
 	}
 
-	if m.mode == ModeGotoMenu {
+	if m.mode == ModeGoto {
 		return overlayModal(base, m.renderGotoModal(), w, h)
 	}
 
@@ -191,9 +198,9 @@ func (m model) renderList(width, height int) string {
 	// stays as tight as possible and reflows correctly when the search filter
 	// changes.
 	// Cap is tighter on narrower list panes (< wideLayoutBreakpoint cols).
-	maxPathW := maxPathWWide
+	maxPathW := maxPathWidthWide
 	if width < wideLayoutBreakpoint {
-		maxPathW = maxPathWNarrow
+		maxPathW = maxPathWidthNarrow
 	}
 	pathColW := 0
 	for _, s := range m.filtered {
@@ -206,7 +213,7 @@ func (m model) renderList(width, height int) string {
 	}
 
 	for i := visibleStart; i < len(m.filtered) && i < visibleStart+height; i++ {
-		sb.WriteString(formatRow(m.filtered[i], width, pathColW, i == m.cursor) + "\n")
+		sb.WriteString(formatSessionRow(m.filtered[i], width, pathColW, i == m.cursor) + "\n")
 	}
 
 	return strings.TrimRight(sb.String(), "\n")
@@ -343,7 +350,7 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		used := 0
 		first := len(blocks)
 		for i := len(blocks) - 1; i >= 0; i-- {
-			cost := strings.Count(blocks[i], "\n") + 1 + 1
+			cost := strings.Count(blocks[i], "\n") + 1 + 1 // +1: final line has no trailing \n; +1: blank separator line between blocks
 			if used+cost > msgHeight {
 				break
 			}
@@ -418,6 +425,12 @@ func renderHintSegments(hints string) string {
 	return sb.String()
 }
 
+// renderTopBar renders the single-row top border bar that pads the viewport
+// against window chrome (titlebars, tab bars, etc.) that may clip the top row.
+func renderTopBar(width int) string {
+	return styleTopBar.Width(width).Render("")
+}
+
 func (m model) renderHint(width int) string {
 	appName := styleDim.Render(" ") +
 		lipgloss.NewStyle().Foreground(colorBlue).Render("Lazy") +
@@ -433,7 +446,7 @@ func (m model) renderHint(width int) string {
 		hints = "  y/d: confirm   n/esc: cancel"
 	case ModeYank:
 		hints = "  d: directory   s: session id   esc: cancel"
-	case ModeGotoMenu:
+	case ModeGoto:
 		hints = "  s: shell   w: workspace   esc: cancel"
 	default:
 		hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
@@ -455,7 +468,7 @@ func (m model) renderHint(width int) string {
 		badge = styleModeConfirmDelete.Render("DELETE")
 	case ModeYank:
 		badge = styleModeYank.Render("YANK")
-	case ModeGotoMenu:
+	case ModeGoto:
 		badge = styleModeGoto.Render("GOTO")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
@@ -487,7 +500,7 @@ func (m model) renderHint(width int) string {
 	return styleHint.Width(width).Render(left + strings.Repeat(" ", space) + badge)
 }
 
-// formatRow renders a single session as a fixed-layout row.
+// formatSessionRow renders a single session as a fixed-layout row.
 //
 // Layout (all widths in terminal columns):
 //
@@ -505,7 +518,7 @@ func (m model) renderHint(width int) string {
 // All width arithmetic is performed on plain text before any style is applied.
 // Adding a new decoration to any cell later only requires touching that cell's
 // style call — the numbers never need to change.
-func formatRow(s Session, width, pathColW int, selected bool) string {
+func formatSessionRow(s Session, width, pathColW int, selected bool) string {
 	const (
 		leadSp  = 1 // single leading space
 		minGap  = 2 // minimum spaces between title and path
@@ -526,10 +539,10 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	effectiveDateGap := 0
 	switch {
 	case showDateFull:
-		effectiveDateW = dateWFull
+		effectiveDateW = dateFullWidth
 		effectiveDateGap = dateGap
 	case showDateShort:
-		effectiveDateW = dateWShort
+		effectiveDateW = dateShortWidth
 		effectiveDateGap = dateGap
 	}
 
@@ -562,8 +575,8 @@ func formatRow(s Session, width, pathColW int, selected bool) string {
 	// Path: right-aligned, space-padded on the left.
 	paddedPath := strings.Repeat(" ", effectivePathW-lipgloss.Width(rawPath)) + rawPath
 	// Trailing fill: keeps the background unbroken to the edge of the list pane.
-	assembled := leadSp + effectiveDateW + effectiveDateGap + titleW + effectiveMinGap + effectivePathW + trailSp
-	trailFill := strings.Repeat(" ", max(0, width-assembled))
+	fixedCols := leadSp + effectiveDateW + effectiveDateGap + titleW + effectiveMinGap + effectivePathW + trailSp
+	trailFill := strings.Repeat(" ", max(0, width-fixedCols))
 
 	// ── per-cell styles ───────────────────────────────────────────────────────
 	// Every span is styled independently and carries the background color (when
@@ -692,7 +705,7 @@ func (m model) renderSessionModal() string {
 		styleModalKeyCancel.Render("No [n]")
 
 	content := styleModalTitle.Render("Delete session?") + "\n\n" +
-		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerW)) + "\n\n" +
+		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerWidth)) + "\n\n" +
 		confirm
 
 	return styleModal.Render(content)
@@ -717,8 +730,18 @@ func (m model) renderWorkspaceModal() string {
 	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
 		styleModalKeyCancel.Render("No [n]")
 
+	// Use pre-computed DisplayDir from the workspace to avoid calling
+	// os.UserHomeDir in the render path (AGENTS.md convention).
+	displayPath := m.pendingDeleteWorkspace
+	for _, ws := range m.workspaces {
+		if ws.Dir == m.pendingDeleteWorkspace {
+			displayPath = ws.DisplayDir
+			break
+		}
+	}
+
 	content := styleModalTitle.Render("Delete workspace?") + "\n\n" +
-		stylePreviewTitle.Render(truncate(displayDir(m.pendingDeleteWorkspace), modalInnerW)) + "\n" +
+		stylePreviewTitle.Render(truncate(displayPath, modalInnerWidth)) + "\n" +
 		countLine + "\n\n" +
 		confirm
 
@@ -733,14 +756,15 @@ func (m model) renderWorkspaceModal() string {
 func (m model) renderWorkspacesView(w, h int) string {
 	hint := m.renderHint(w)
 	hintH := strings.Count(hint, "\n") + 1
-	bodyH := h - hintH
+	topBar := renderTopBar(w)
+	bodyH := h - hintH - topBarH
 
 	// Secondary (right) pane takes the same share as the preview pane in the
 	// main view; primary (left) pane takes the remainder. Mirrors View()'s
 	// previewW / listW split but for the workspaces layout.
 	rightW := w * previewWidthPct / 100
-	if rightW < workspacesRightMinW {
-		rightW = workspacesRightMinW
+	if rightW < workspacesRightMinWidth {
+		rightW = workspacesRightMinWidth
 	}
 	leftW := w - rightW
 
@@ -748,7 +772,7 @@ func (m model) renderWorkspacesView(w, h int) string {
 	right := m.renderWorkspaceSessions(rightW, bodyH)
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	return body + "\n" + hint
+	return topBar + "\n" + body + "\n" + hint
 }
 
 // renderWorkspaceList renders the left pane: a scrollable list of workspace
@@ -773,7 +797,7 @@ func (m model) renderWorkspaceList(width, height int) string {
 	for i := visibleStart; i < len(m.workspaces) && i < visibleStart+height; i++ {
 		ws := m.workspaces[i]
 		selected := i == m.workspaceCursor
-		sb.WriteString(formatWorkspaceRow(ws.Dir, ws.DisplayDir, width, selected) + "\n")
+		sb.WriteString(formatWorkspaceRow(ws.DisplayDir, width, selected) + "\n")
 	}
 
 	return sb.String()
@@ -781,11 +805,9 @@ func (m model) renderWorkspaceList(width, height int) string {
 
 // formatWorkspaceRow renders a single workspace directory as a fixed-width row.
 // displayDir is the pre-computed display string (with "~" substitution).
-func formatWorkspaceRow(dir, displayDir string, width int, selected bool) string {
+func formatWorkspaceRow(displayDir string, width int, selected bool) string {
 	const leadSp = 1
 	const trailSp = 1
-
-	_ = dir // raw dir available if needed in future; display uses displayDir
 
 	innerW := width - leadSp - trailSp
 	if innerW < 1 {
@@ -866,10 +888,10 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 }
 
 // formatWorkspaceSessionRow renders a compact session row for the workspaces
-// right pane. Layout: date(dateWFull) "  " title(remaining). No path column
+// right pane. Layout: date(dateFullWidth) "  " title(remaining). No path column
 // needed since all sessions share the same workspace directory.
 func formatWorkspaceSessionRow(s Session, width int) string {
-	titleW := width - dateWFull - dateGap
+	titleW := width - dateFullWidth - dateGap
 	if titleW < 1 {
 		titleW = 1
 	}

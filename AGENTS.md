@@ -15,11 +15,11 @@ lazyopencode is a terminal UI (TUI) for managing [opencode](https://opencode.ai)
 | File | Purpose |
 |------|---------|
 | `main.go` | Entry point; resolves the DB path and starts the Bubble Tea program |
-| `model.go` | App state (`model` struct), `Init`/`Update` logic, session filtering, message types |
-| `view.go` | `View` function and pure render utilities (`formatRow`, `truncate`, etc.) |
-| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`, `updateWorkspaces`, `updateConfirmDelete`, `updateConfirmDeleteWorkspace`) |
+| `model.go` | App state (`model` struct), `Init`/`Update` logic, all command constructors (`loadMessagesForCursor`, `loadSessionsCmd`, `openSessionCmd`, etc.), message types |
+| `view.go` | `View` function and pure render utilities (`formatSessionRow`, `truncate`, etc.) |
+| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`, `updateWorkspaces`, `updateConfirmDelete`, `updateConfirmDeleteWorkspace`, `updateGoto`); `clamp` |
 | `keys.go` | Key bindings (`KeyMap`) and `Mode` enum |
-| `session.go` | `Session` and `Message` types; `displayDir` and `shortDir` helpers |
+| `session.go` | `Session` and `Message` types; `homeToTilde` and `baseName` helpers; `filterSessions`, `buildWorkspaces`, `removeSessionByID` |
 | `db.go` | SQLite queries — `loadSessions` and `loadMessages`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
 | `styles.go` | Lip Gloss style definitions |
 | `Makefile` | `build`, `install`, `fmt`, `vet`, `lint`, `test`, `check` targets |
@@ -58,6 +58,7 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 | Add a new message type | `model.go` only |
 | Add a new display mode | `keys.go`, `model.go`, `update.go`, `view.go` |
 | Add a session or message field | `session.go` + `db.go` |
+| Add a pure session/workspace helper | `session.go` only |
 | Change lint rules | `.golangci.yml` only |
 | Change editor conventions | `.editorconfig` only |
 

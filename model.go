@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -130,6 +129,18 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 	}
 }
 
+// loadMessagesForCursor returns an updated model with a batched command to
+// reload messages and stats for the selected session. Stale content is kept
+// visible until the new data arrives to prevent layout jumps and flash.
+func (m model) loadMessagesForCursor() (model, tea.Cmd) {
+	if len(m.filtered) == 0 {
+		return m, nil
+	}
+	id := m.filtered[m.cursor].ID
+	m.previewSessionID = id
+	return m, tea.Batch(m.loadMessagesCmd(id), m.loadStatsCmd(id))
+}
+
 // openSessionCmd suspends lazyopencode, hands the terminal to opencode running in
 // the session's directory, then resumes and reloads sessions when it exits.
 func (m model) openSessionCmd(id, dir string) tea.Cmd {
@@ -155,11 +166,8 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	}
 	c := exec.Command(shell)
 	c.Dir = dir
-	printCmd := func() tea.Msg {
-		_, _ = fmt.Fprintf(os.Stdout, "\nopening shell in %s — type 'exit' to return to lazyopencode\n\n", displayDir(dir))
-		return nil
-	}
-	return tea.Sequence(printCmd, tea.ExecProcess(c, func(err error) tea.Msg {
+	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir))
+	return tea.Sequence(tea.Println(notice), tea.ExecProcess(c, func(err error) tea.Msg {
 		return shellExitedMsg{}
 	}))
 }
@@ -186,7 +194,7 @@ func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		if err := exec.Command("opencode", "session", "delete", sessionID).Run(); err != nil {
+		if err := deleteOneSession(sessionID); err != nil {
 			return errMsg{err: err}
 		}
 		return sessionDeletedMsg{}
@@ -202,12 +210,19 @@ func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
 	}
 	return func() tea.Msg {
 		for _, id := range ids {
-			if err := exec.Command("opencode", "session", "delete", id).Run(); err != nil {
+			if err := deleteOneSession(id); err != nil {
 				return errMsg{err: err}
 			}
 		}
 		return sessionDeletedMsg{}
 	}
+}
+
+// deleteOneSession shells out to `opencode session delete <id>`.
+// Keeping deletion delegated to the owning process ensures lazyopencode
+// remains read-only at the DB layer.
+func deleteOneSession(id string) error {
+	return exec.Command("opencode", "session", "delete", id).Run()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -294,52 +309,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateConfirmDeleteWorkspace(msg)
 		case ModeYank:
 			return m.updateYank(msg)
-		case ModeGotoMenu:
-			return m.updateGotoMenu(msg)
+		case ModeGoto:
+			return m.updateGoto(msg)
 		}
 	}
 	return m, nil
-}
-
-// filterSessions returns the subset of sessions matching query
-// against each session's FilterValue (title + directory).
-func filterSessions(sessions []Session, query string) []Session {
-	if query == "" {
-		return sessions
-	}
-	q := strings.ToLower(query)
-	out := make([]Session, 0, len(sessions))
-	for _, s := range sessions {
-		if strings.Contains(strings.ToLower(s.FilterValue()), q) {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// buildWorkspaces returns a sorted, deduplicated list of workspace values from
-// the given sessions. DisplayDir is pre-computed once here to avoid calling
-// os.UserHomeDir on every render frame.
-func buildWorkspaces(sessions []Session) []workspace {
-	seen := make(map[string]struct{}, len(sessions))
-	for _, s := range sessions {
-		seen[s.Directory] = struct{}{}
-	}
-	ws := make([]workspace, 0, len(seen))
-	for dir := range seen {
-		ws = append(ws, workspace{Dir: dir, DisplayDir: displayDir(dir)})
-	}
-	sort.Slice(ws, func(i, j int) bool { return ws[i].Dir < ws[j].Dir })
-	return ws
-}
-
-// clamp constrains v to [lo, hi].
-func clamp(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
 }

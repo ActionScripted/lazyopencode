@@ -12,7 +12,7 @@ const (
 	ModeConfirmDelete
 	ModeConfirmDeleteWorkspace
 	ModeYank
-	ModeGotoMenu
+	ModeGoto
 )
 
 // KeyMap holds all named key bindings for the application.

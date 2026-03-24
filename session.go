@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -60,19 +61,62 @@ func (s Session) ShortDirectory() string {
 	return s.ShortDir
 }
 
-// displayDir replaces the home directory prefix with "~" in the given path.
+// homeToTilde replaces the home directory prefix with "~" in the given path.
 // Called once at load time to populate Session.DisplayDir.
-func displayDir(dir string) string {
+func homeToTilde(dir string) string {
 	home, _ := os.UserHomeDir()
 	return strings.Replace(dir, home, "~", 1)
 }
 
-// shortDir returns just the last path component of dir, or "~" if dir is the
+// baseName returns just the last path component of dir, or "~" if dir is the
 // user's home directory. Called once at load time to populate Session.ShortDir.
-func shortDir(dir string) string {
+func baseName(dir string) string {
 	home, _ := os.UserHomeDir()
 	if dir == home {
 		return "~"
 	}
 	return filepath.Base(dir)
+}
+
+// filterSessions returns the subset of sessions matching query
+// against each session's FilterValue (title + directory).
+func filterSessions(sessions []Session, query string) []Session {
+	if query == "" {
+		return sessions
+	}
+	q := strings.ToLower(query)
+	out := make([]Session, 0, len(sessions))
+	for _, s := range sessions {
+		if strings.Contains(strings.ToLower(s.FilterValue()), q) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// buildWorkspaces returns a sorted, deduplicated list of workspace values from
+// the given sessions. DisplayDir is pre-computed once here to avoid calling
+// os.UserHomeDir on every render frame.
+func buildWorkspaces(sessions []Session) []workspace {
+	seen := make(map[string]struct{}, len(sessions))
+	for _, s := range sessions {
+		seen[s.Directory] = struct{}{}
+	}
+	ws := make([]workspace, 0, len(seen))
+	for dir := range seen {
+		ws = append(ws, workspace{Dir: dir, DisplayDir: homeToTilde(dir)})
+	}
+	sort.Slice(ws, func(i, j int) bool { return ws[i].Dir < ws[j].Dir })
+	return ws
+}
+
+// removeSessionByID returns a new slice with the session matching id removed.
+func removeSessionByID(sessions []Session, id string) []Session {
+	out := make([]Session, 0, len(sessions))
+	for _, s := range sessions {
+		if s.ID != id {
+			out = append(out, s)
+		}
+	}
+	return out
 }

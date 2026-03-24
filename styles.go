@@ -79,6 +79,11 @@ var (
 			BorderBottom(true).
 			BorderForeground(colorBorder)
 
+	styleTopBar = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(colorBorder)
+
 	// Badge base: shared foundation for all mode badges and modal key badges.
 	// Each specific badge derives from this by setting its Background color.
 	styleBadgeBase = lipgloss.NewStyle().

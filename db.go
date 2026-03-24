@@ -8,22 +8,34 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// openReadOnlyDB opens the SQLite database at path in read-only mode and pings
+// it. Returns (db, false, nil) on success. Returns (nil, true, nil) when the
+// file does not exist (caller should treat this as empty state). Returns
+// (nil, false, err) for any other failure.
+func openReadOnlyDB(path string) (*sql.DB, bool, error) {
+	db, err := sql.Open("sqlite", path+"?mode=ro")
+	if err != nil {
+		return nil, false, fmt.Errorf("open db: %w", err)
+	}
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, true, nil // missing file — treat as empty
+	}
+	return db, false, nil
+}
+
 // loadSessions opens the opencode SQLite database and returns all primary
 // sessions (parent_id IS NULL), ordered by most recently updated.
 // Returns an empty slice (not an error) if the database file does not exist.
 func loadSessions(dbPath string) ([]Session, error) {
-	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
+		return nil, err
 	}
-	defer func() { _ = db.Close() }()
-
-	// Ping to detect missing file early — sqlite returns an error here if the
-	// file doesn't exist when opened read-only.
-	if err := db.Ping(); err != nil {
-		// Treat missing DB as empty state, not a fatal error.
+	if missing {
 		return []Session{}, nil
 	}
+	defer func() { _ = db.Close() }()
 
 	rows, err := db.Query(`
 		SELECT id, title, directory,
@@ -53,8 +65,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 		}
 		s.CreatedAt = time.Unix(createdMS/1000, 0)
 		s.UpdatedAt = time.Unix(updatedMS/1000, 0)
-		s.DisplayDir = displayDir(s.Directory)
-		s.ShortDir = shortDir(s.Directory)
+		s.DisplayDir = homeToTilde(s.Directory)
+		s.ShortDir = baseName(s.Directory)
 		sessions = append(sessions, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -67,15 +79,14 @@ func loadSessions(dbPath string) ([]Session, error) {
 // loadMessages returns all text messages for a session, ordered by time.
 // One entry per message (first non-empty text part).
 func loadMessages(dbPath, sessionID string) ([]Message, error) {
-	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open db: %w", err)
+		return nil, err
 	}
-	defer func() { _ = db.Close() }()
-
-	if err := db.Ping(); err != nil {
+	if missing {
 		return []Message{}, nil
 	}
+	defer func() { _ = db.Close() }()
 
 	rows, err := db.Query(`
 		SELECT json_extract(m.data, '$.role'), json_extract(p.data, '$.text')
@@ -116,15 +127,14 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 // Returns a zero-value SessionStats (not an error) if no step-finish parts
 // exist (pure chat sessions with no model calls).
 func loadStats(dbPath, sessionID string) (SessionStats, error) {
-	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		return SessionStats{}, fmt.Errorf("open db: %w", err)
+		return SessionStats{}, err
 	}
-	defer func() { _ = db.Close() }()
-
-	if err := db.Ping(); err != nil {
+	if missing {
 		return SessionStats{}, nil
 	}
+	defer func() { _ = db.Close() }()
 
 	var stats SessionStats
 	var outputTokens, contextTokens *int // nullable — NULL when no step-finish parts

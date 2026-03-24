@@ -6,6 +6,17 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// clamp constrains v to [lo, hi].
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
 func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
@@ -54,7 +65,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		m.mode = ModeGotoMenu
+		m.mode = ModeGoto
 		return m, nil
 
 	case key.Matches(msg, m.keys.Delete):
@@ -122,29 +133,6 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
-}
-
-// loadMessagesForCursor returns an updated model with a batched command to
-// reload messages and stats for the selected session. Stale content is kept
-// visible until the new data arrives to prevent layout jumps and flash.
-func (m model) loadMessagesForCursor() (model, tea.Cmd) {
-	if len(m.filtered) == 0 {
-		return m, nil
-	}
-	id := m.filtered[m.cursor].ID
-	m.previewSessionID = id
-	return m, tea.Batch(m.loadMessagesCmd(id), m.loadStatsCmd(id))
-}
-
-// removeSessionByID returns a new slice with the session matching id removed.
-func removeSessionByID(sessions []Session, id string) []Session {
-	out := make([]Session, 0, len(sessions))
-	for _, s := range sessions {
-		if s.ID != id {
-			out = append(out, s)
-		}
-	}
-	return out
 }
 
 // updateConfirmDeleteWorkspace handles key events while
@@ -225,10 +213,10 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateGotoMenu handles key events while ModeGotoMenu is active.
+// updateGoto handles key events while ModeGoto is active.
 // s opens a shell in the session's directory; w jumps to the workspace view.
 // esc/q/n cancels back to normal mode.
-func (m model) updateGotoMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateGoto(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if len(m.filtered) == 0 {
 		m.mode = ModeNormal
 		return m, nil
