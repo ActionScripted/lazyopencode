@@ -218,11 +218,18 @@ func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
 	}
 }
 
+// runCommand is the exec back-end used by deleteOneSession. It is a
+// package-level variable so tests can swap it for a stub without spawning a
+// real process.
+var runCommand = func(name string, args ...string) error {
+	return exec.Command(name, args...).Run()
+}
+
 // deleteOneSession shells out to `opencode session delete <id>`.
 // Keeping deletion delegated to the owning process ensures lazyopencode
 // remains read-only at the DB layer.
 func deleteOneSession(id string) error {
-	return exec.Command("opencode", "session", "delete", id).Run()
+	return runCommand("opencode", "session", "delete", id)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
