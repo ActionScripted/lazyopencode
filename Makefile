@@ -35,7 +35,7 @@ test:
 check: fmt vet lint test
 
 release: check
-	@latest=$$(git tag --sort=-v:refname | head -1); \
+	@latest=$$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -1); \
 	suggested=$$(echo $$latest | awk -F. '{$$NF=$$NF+1; print $$0}' OFS=.); \
 	printf "Latest tag: $$latest\nNew tag [$$suggested]: "; \
 	read input; \
