@@ -39,6 +39,14 @@ var (
 				PaddingLeft(1).
 				PaddingRight(1)
 
+	stylePreviewPaneStacked = lipgloss.NewStyle().
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderTop(true).
+				BorderForeground(colorBorder).
+				Foreground(colorFg).
+				PaddingLeft(1).
+				PaddingRight(1)
+
 	stylePreviewTitle = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(colorFg)

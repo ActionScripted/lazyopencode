@@ -29,17 +29,40 @@ func (m model) View() string {
 	}
 
 	previewW := w * 45 / 100
-	if previewW < 30 {
-		previewW = 30
-	}
 	listW := w - previewW
 
-	// hint bar occupies 2 rows (border + text) in wide mode,
-	// or 2 rows (hints + logo) in narrow mode (w < 182).
-	list := styleListPane.Width(listW).Height(h - 2).Render(m.renderList(listW, h-4))
-	preview := m.renderPreview(previewW, h-2)
+	var body string
+	if w < 120 {
+		// Narrow: stack list on top, preview below.
+		const listMinH = 6
+		bodyH := h - 2
 
-	body := lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
+		var listH, previewH int
+		if bodyH < 24 {
+			// Too short for both — give list the floor, drop preview.
+			listH = bodyH
+			previewH = 0
+		} else {
+			listH = bodyH * 40 / 100
+			if listH < listMinH {
+				listH = listMinH
+			}
+			previewH = bodyH - listH
+		}
+
+		list := styleListPane.Width(w).Height(listH).Render(m.renderList(w, listH-2))
+		if previewH == 0 {
+			body = list
+		} else {
+			preview := m.renderPreview(w, previewH, true)
+			body = list + "\n" + preview
+		}
+	} else {
+		// Wide: side-by-side list (left) and preview (right).
+		list := styleListPane.Width(listW).Height(h - 2).Render(m.renderList(listW, h-4))
+		preview := m.renderPreview(previewW, h-2, false)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
+	}
 	hint := m.renderHint(w)
 
 	base := body + "\n" + hint
@@ -115,11 +138,22 @@ func (m model) renderList(width, height int) string {
 	return sb.String()
 }
 
-func (m model) renderPreview(width, height int) string {
-	inner := width - 4 // account for border + padding
+func (m model) renderPreview(width, height int, stacked bool) string {
+	// In stacked mode the pane spans the full terminal width with a top border
+	// (1 row) and left+right padding (1 col each) — so inner = width - 2.
+	// In side-by-side mode the pane has a left border (1 col) and left+right
+	// padding (1 col each) — so inner = width - 4, and Width arg = width - 2.
+	paneStyle := stylePreviewPane
+	paneW := width - 2
+	inner := width - 4
+	if stacked {
+		paneStyle = stylePreviewPaneStacked
+		paneW = width
+		inner = width - 2
+	}
 
 	if len(m.filtered) == 0 {
-		return stylePreviewPane.Width(width - 2).Height(height).Render(
+		return paneStyle.Width(paneW).Height(height).Render(
 			styleDim.Render("no selection"),
 		)
 	}
@@ -253,7 +287,7 @@ func (m model) renderPreview(width, height int) string {
 		msgSection = sb.String()
 	}
 
-	return stylePreviewPane.Width(width - 2).Height(height).Render(header.String() + msgSection)
+	return paneStyle.Width(paneW).Height(height).Render(header.String() + msgSection)
 }
 
 // formatDuration formats a duration for display in the preview header.
