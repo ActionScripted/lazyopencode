@@ -9,14 +9,82 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// ── Layout constants ──────────────────────────────────────────────────────────
+//
+// All sizing magic lives here. Touch these if you need to adjust proportions,
+// breakpoints, or overhead accounting — nothing else should need to change.
+
+const (
+	// Terminal size fallbacks (classic VT100 dimensions).
+	defaultTermW = 80
+	defaultTermH = 24
+
+	// Layout breakpoints (terminal width in columns).
+	wideLayoutBreakpoint     = 120 // wide (side-by-side) vs. narrow (stacked)
+	singleLineHintBreakpoint = 182 // hint bar: one row vs. two rows
+
+	// Split percentages (integer arithmetic out of 100).
+	previewWidthPct = 45 // preview pane share of terminal width in wide mode
+	listHeightPct   = 40 // list pane share of body height in stacked mode
+
+	// Minimum list pane height in stacked mode (prevents the list from
+	// collapsing to nothing when the terminal is very short).
+	listMinH = 6
+
+	// Minimum body height required to show both list + preview in stacked
+	// mode; below this threshold the preview is dropped entirely.
+	minStackedBodyH = 24
+
+	// Hint bar.
+	hintBarWidthAdj = 1 // intentional 1-col right margin for badge placement; borders still extend to full width
+
+	// Rows consumed by the search input + separator drawn at the top of
+	// renderList. Wide mode passes (paneH - listHeaderRows) as the content
+	// height so those rows are not double-counted.
+	listHeaderRows = 2
+
+	// Pane border/padding overhead — derived from the lipgloss box model.
+	//
+	// stylePreviewPane (BorderLeft + PaddingLeft(1) + PaddingRight(1)):
+	//   outer width  = Width() + 1   → paneHorizBorder = 1
+	//   text area    = Width() - 2   → paneHorizPadding = 2
+	//   outer height = Height()      → no vertical border cost
+	//
+	// stylePreviewPaneStacked (BorderTop + PaddingLeft(1) + PaddingRight(1)):
+	//   outer width  = Width()       → no horizontal border cost
+	//   text area    = Width() - 2   → same padding overhead
+	//   outer height = Height() + 1  → paneVertBorderStacked = 1
+	//
+	// Callers always pass the desired outer height; renderPreview subtracts
+	// paneVertBorderStacked internally for the stacked case.
+	paneHorizBorder       = 1 // left border col cost (side-by-side mode)
+	paneHorizPadding      = 2 // PaddingLeft(1)+PaddingRight(1) inner cost
+	paneVertBorderStacked = 1 // top border row cost (stacked mode)
+
+	// Path column caps in renderList.
+	maxPathWWide   = 30
+	maxPathWNarrow = 20
+
+	// Modal inner content width (max chars for a title inside a delete modal).
+	modalInnerW = 46
+
+	// Minimum right-pane width in the workspaces view.
+	workspacesRightMinW = 30
+
+	// Date/time column widths (shared by formatRow and formatWorkspaceSessionRow).
+	dateWFull  = 16 // "2006-01-02 15:04" — always exactly 16 columns
+	dateWShort = 6  // "Jan 02"            — always exactly 6 columns
+	dateGap    = 2  // spaces between the date column and the title column
+)
+
 func (m model) View() string {
 	w := m.width
 	if w == 0 {
-		w = 80
+		w = defaultTermW
 	}
 	h := m.height
 	if h == 0 {
-		h = 24
+		h = defaultTermH
 	}
 
 	if m.mode == ModeWorkspaces {
@@ -28,29 +96,33 @@ func (m model) View() string {
 		return overlayModal(base, m.renderWorkspaceModal(), w, h)
 	}
 
-	previewW := w * 45 / 100
+	previewW := w * previewWidthPct / 100
 	listW := w - previewW
 
+	// Render the hint first to measure its height. Row counts are additive:
+	// body rows + hint rows = h. The "\n" joining them is just a line terminator.
+	hint := m.renderHint(w)
+	hintH := strings.Count(hint, "\n") + 1
+
 	var body string
-	if w < 120 {
+	if w < wideLayoutBreakpoint {
 		// Narrow: stack list on top, preview below.
-		const listMinH = 6
-		bodyH := h - 2
+		bodyH := h - hintH
 
 		var listH, previewH int
-		if bodyH < 24 {
-			// Too short for both — give list the floor, drop preview.
+		if bodyH < minStackedBodyH {
+			// Too short for both panes — give the list the full height, drop preview.
 			listH = bodyH
 			previewH = 0
 		} else {
-			listH = bodyH * 40 / 100
+			listH = bodyH * listHeightPct / 100
 			if listH < listMinH {
 				listH = listMinH
 			}
 			previewH = bodyH - listH
 		}
 
-		list := styleListPane.Width(w).Height(listH).Render(m.renderList(w, listH-2))
+		list := styleListPane.Width(w).Height(listH).Render(m.renderList(w, listH-listHeaderRows))
 		if previewH == 0 {
 			body = list
 		} else {
@@ -59,11 +131,13 @@ func (m model) View() string {
 		}
 	} else {
 		// Wide: side-by-side list (left) and preview (right).
-		list := styleListPane.Width(listW).Height(h - 2).Render(m.renderList(listW, h-4))
-		preview := m.renderPreview(previewW, h-2, false)
+		paneH := h - hintH
+		// renderList draws listHeaderRows lines internally, so pass paneH minus
+		// that overhead as the scrollable content height.
+		list := styleListPane.Width(listW).Height(paneH).Render(m.renderList(listW, paneH-listHeaderRows))
+		preview := m.renderPreview(previewW, paneH, false)
 		body = lipgloss.JoinHorizontal(lipgloss.Top, list, preview)
 	}
-	hint := m.renderHint(w)
 
 	base := body + "\n" + hint
 
@@ -91,7 +165,7 @@ func (m model) renderList(width, height int) string {
 		prefix = styleSearchPrefix.Render("> ")
 	}
 	sb.WriteString(prefix + m.search.View() + "\n")
-	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width-1)) + "\n")
+	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width)) + "\n")
 
 	if m.err != nil {
 		sb.WriteString(styleDim.Render("  error: "+m.err.Error()) + "\n")
@@ -116,10 +190,10 @@ func (m model) renderList(width, height int) string {
 	// Compute the path column width from the visible session set so the column
 	// stays as tight as possible and reflows correctly when the search filter
 	// changes.
-	// Cap is tighter on narrower list panes (< 120 cols).
-	maxPathW := 30
-	if width < 120 {
-		maxPathW = 20
+	// Cap is tighter on narrower list panes (< wideLayoutBreakpoint cols).
+	maxPathW := maxPathWWide
+	if width < wideLayoutBreakpoint {
+		maxPathW = maxPathWNarrow
 	}
 	pathColW := 0
 	for _, s := range m.filtered {
@@ -135,22 +209,21 @@ func (m model) renderList(width, height int) string {
 		sb.WriteString(formatRow(m.filtered[i], width, pathColW, i == m.cursor) + "\n")
 	}
 
-	return sb.String()
+	return strings.TrimRight(sb.String(), "\n")
 }
 
 func (m model) renderPreview(width, height int, stacked bool) string {
-	// In stacked mode the pane spans the full terminal width with a top border
-	// (1 row) and left+right padding (1 col each) — so inner = width - 2.
-	// In side-by-side mode the pane has a left border (1 col) and left+right
-	// padding (1 col each) — so inner = width - 4, and Width arg = width - 2.
+	// Callers pass the outer height they want (total rows including borders).
+	// stacked mode has a top border (1 row) that eats into the content height;
+	// side-by-side mode has only a left border (no vertical cost).
 	paneStyle := stylePreviewPane
-	paneW := width - 2
-	inner := width - 4
+	paneW := width - paneHorizBorder // outer == width (left border adds 1 col)
 	if stacked {
 		paneStyle = stylePreviewPaneStacked
-		paneW = width
-		inner = width - 2
+		paneW = width                   // top border adds no horizontal cost
+		height -= paneVertBorderStacked // top border costs 1 outer row
 	}
+	inner := paneW - paneHorizPadding // text area for both styles
 
 	if len(m.filtered) == 0 {
 		return paneStyle.Width(paneW).Height(height).Render(
@@ -234,9 +307,9 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		header.WriteString("\n")
 	}
 
-	// separator
 	header.WriteString("\n")
-	header.WriteString(styleDim.Render("─── messages " + strings.Repeat("─", max(0, inner-13))))
+	header.WriteString(styleDim.Render(strings.Repeat("─", max(0, inner))))
+	header.WriteString("\n")
 
 	// ── messages ──────────────────────────────────────────────────────────────
 	// Compute header height dynamically so it never drifts out of sync.
@@ -287,7 +360,7 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		msgSection = sb.String()
 	}
 
-	return paneStyle.Width(paneW).Height(height).Render(header.String() + msgSection)
+	return paneStyle.Width(paneW).Height(height).Render(strings.TrimRight(header.String()+msgSection, "\n"))
 }
 
 // formatDuration formats a duration for display in the preview header.
@@ -388,25 +461,30 @@ func (m model) renderHint(width int) string {
 		badge = styleModeNormal.Render("NORMAL")
 	}
 
-	if width < 182 {
+	// innerW: content width for badge placement — 1-col right margin so the
+	// mode badge is not flush to the terminal edge.
+	// The border-bearing styleHint uses the full width so borders reach the edge.
+	innerW := width - hintBarWidthAdj
+
+	if width < singleLineHintBreakpoint {
 		// Narrow layout: hints on top (with border), logo + mode badge below.
-		hintLine := styleHint.Width(width - 1).Render(renderHintSegments(hints))
+		hintLine := styleHint.Width(width).Render(renderHintSegments(hints))
 		logo := appName + dots
-		space := width - 1 - lipgloss.Width(logo) - lipgloss.Width(badge)
+		space := innerW - lipgloss.Width(logo) - lipgloss.Width(badge)
 		if space < 1 {
 			space = 1
 		}
-		logoLine := styleHint.UnsetBorderTop().Width(width - 1).Render(logo + strings.Repeat(" ", space) + badge)
+		logoLine := styleHintBottom.Foreground(colorDim).Width(width).Render(logo + strings.Repeat(" ", space) + badge)
 		return hintLine + "\n" + logoLine
 	}
 
 	left := appName + dots + renderHintSegments(hints)
-	space := width - 1 - lipgloss.Width(left) - lipgloss.Width(badge)
+	space := innerW - lipgloss.Width(left) - lipgloss.Width(badge)
 	if space < 1 {
 		space = 1
 	}
 
-	return styleHint.Width(width - 1).Render(left + strings.Repeat(" ", space) + badge)
+	return styleHint.Width(width).Render(left + strings.Repeat(" ", space) + badge)
 }
 
 // formatRow renders a single session as a fixed-layout row.
@@ -429,23 +507,20 @@ func (m model) renderHint(width int) string {
 // style call — the numbers never need to change.
 func formatRow(s Session, width, pathColW int, selected bool) string {
 	const (
-		leadSp     = 1  // single leading space
-		dateWFull  = 16 // "2006-01-02 15:04" is always exactly 16 columns
-		dateWShort = 6  // "Jan 02" is always exactly 6 columns
-		dateGap    = 2  // spaces between date and title
-		minGap     = 2  // minimum spaces between title and path
-		trailSp    = 1  // single trailing space
+		leadSp  = 1 // single leading space
+		minGap  = 2 // minimum spaces between title and path
+		trailSp = 1 // single trailing space
 	)
 
 	// Responsive column hiding/shortening:
-	//   >= 120: full date "2006-01-02 15:04"
-	//   >= 80:  short date "Jan 02"
-	//   <  80:  no date
-	//   >= 77:  path column shown
-	showDateFull := width >= 120
-	showDateShort := width >= 80 && !showDateFull
+	//   >= wideLayoutBreakpoint: full date "2006-01-02 15:04"
+	//   >= 80:                   short date "Jan 02"
+	//   <  80:                   no date
+	//   >= 80:                   path column shown
+	showDateFull := width >= wideLayoutBreakpoint
+	showDateShort := width >= defaultTermW && !showDateFull
 	showDate := showDateFull || showDateShort
-	showPath := width >= 80
+	showPath := width >= defaultTermW
 
 	effectiveDateW := 0
 	effectiveDateGap := 0
@@ -605,8 +680,6 @@ func (m model) renderYankModal() string {
 
 // renderSessionModal returns the styled modal for a single-session delete.
 func (m model) renderSessionModal() string {
-	const modalInnerW = 46
-
 	sessionTitle := m.pendingDeleteID
 	for _, s := range m.sessions {
 		if s.ID == m.pendingDeleteID {
@@ -627,8 +700,6 @@ func (m model) renderSessionModal() string {
 
 // renderWorkspaceModal returns the styled modal for a workspace delete.
 func (m model) renderWorkspaceModal() string {
-	const modalInnerW = 46
-
 	count := 0
 	for _, s := range m.sessions {
 		if s.Directory == m.pendingDeleteWorkspace {
@@ -660,12 +731,16 @@ func (m model) renderWorkspaceModal() string {
 // Left pane: navigable list of unique workspace directories.
 // Right pane: read-only list of sessions belonging to the selected workspace.
 func (m model) renderWorkspacesView(w, h int) string {
-	// hint bar: 2 rows in both wide and narrow modes; pane body gets the rest.
-	bodyH := h - 2
+	hint := m.renderHint(w)
+	hintH := strings.Count(hint, "\n") + 1
+	bodyH := h - hintH
 
-	rightW := w * 55 / 100
-	if rightW < 30 {
-		rightW = 30
+	// Secondary (right) pane takes the same share as the preview pane in the
+	// main view; primary (left) pane takes the remainder. Mirrors View()'s
+	// previewW / listW split but for the workspaces layout.
+	rightW := w * previewWidthPct / 100
+	if rightW < workspacesRightMinW {
+		rightW = workspacesRightMinW
 	}
 	leftW := w - rightW
 
@@ -673,8 +748,6 @@ func (m model) renderWorkspacesView(w, h int) string {
 	right := m.renderWorkspaceSessions(rightW, bodyH)
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	hint := m.renderHint(w)
-
 	return body + "\n" + hint
 }
 
@@ -684,7 +757,7 @@ func (m model) renderWorkspaceList(width, height int) string {
 	var sb strings.Builder
 
 	// Header separator (mirrors the search bar separator in the sessions view).
-	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width-1)) + "\n")
+	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width)) + "\n")
 	height-- // consumed by separator
 
 	if len(m.workspaces) == 0 {
@@ -736,10 +809,11 @@ func formatWorkspaceRow(dir, displayDir string, width int, selected bool) string
 // renderWorkspaceSessions renders the right pane: a read-only list of sessions
 // for the currently selected workspace.
 func (m model) renderWorkspaceSessions(width, height int) string {
-	inner := width - 4 // account for border + padding
+	paneW := width - paneHorizBorder  // same overhead as side-by-side preview
+	inner := paneW - paneHorizPadding // text area
 
 	if len(m.workspaces) == 0 {
-		return stylePreviewPane.Width(width - 2).Height(height).Render(
+		return stylePreviewPane.Width(paneW).Height(height).Render(
 			styleDim.Render("no workspaces"),
 		)
 	}
@@ -786,18 +860,16 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 		}
 	}
 
-	return stylePreviewPane.Width(width - 2).Height(height).Render(
+	return stylePreviewPane.Width(paneW).Height(height).Render(
 		header.String() + sessionRows.String(),
 	)
 }
 
 // formatWorkspaceSessionRow renders a compact session row for the workspaces
-// right pane. Layout: date(16) "  " title(remaining). No path column needed
-// since all sessions share the same workspace.
+// right pane. Layout: date(dateWFull) "  " title(remaining). No path column
+// needed since all sessions share the same workspace directory.
 func formatWorkspaceSessionRow(s Session, width int) string {
-	const dateW = 16
-	const gap = 2
-	titleW := width - dateW - gap
+	titleW := width - dateWFull - dateGap
 	if titleW < 1 {
 		titleW = 1
 	}
@@ -806,5 +878,5 @@ func formatWorkspaceSessionRow(s Session, width int) string {
 	title := lipgloss.NewStyle().Foreground(colorBright).Bold(true).
 		Render(truncate(s.Title, titleW))
 
-	return date + strings.Repeat(" ", gap) + title
+	return date + strings.Repeat(" ", dateGap) + title
 }

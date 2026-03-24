@@ -15,6 +15,7 @@ var (
 	colorBorder   = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
 	colorYellow   = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
 	colorGreen    = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
+	colorDanger   = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
 
 	// Text
 	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
@@ -30,7 +31,7 @@ var (
 	styleListPane = lipgloss.NewStyle().
 			Background(colorBgPanel)
 
-	// Preview
+	// Preview panes
 	stylePreviewPane = lipgloss.NewStyle().
 				BorderStyle(lipgloss.NormalBorder()).
 				BorderLeft(true).
@@ -68,37 +69,32 @@ var (
 			Foreground(colorDim).
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderTop(true).
+			BorderBottom(true).
 			BorderForeground(colorBorder)
 
 	styleHintKey = lipgloss.NewStyle().Foreground(colorBright)
 
-	styleModeNormal = lipgloss.NewStyle().
+	styleHintBottom = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(colorBorder)
+
+	// Badge base: shared foundation for all mode badges and modal key badges.
+	// Each specific badge derives from this by setting its Background color.
+	styleBadgeBase = lipgloss.NewStyle().
 			Foreground(colorBg).
-			Background(colorBlue).
 			Bold(true).
 			Padding(0, 1)
 
-	styleModeSearch = lipgloss.NewStyle().
-			Foreground(colorBg).
-			Background(colorYellow).
-			Bold(true).
-			Padding(0, 1)
+	// Mode badges (hint bar)
+	styleModeNormal        = styleBadgeBase.Background(colorBlue)
+	styleModeSearch        = styleBadgeBase.Background(colorYellow)
+	styleModeWorkspaces    = styleBadgeBase.Background(colorCyan)
+	styleModeYank          = styleBadgeBase.Background(colorGreen)
+	styleModeConfirmDelete = styleBadgeBase.Background(colorDanger)
+	styleModeGoto          = styleBadgeBase.Background(colorYellow)
 
-	styleModeWorkspaces = lipgloss.NewStyle().
-				Foreground(colorBg).
-				Background(colorCyan).
-				Bold(true).
-				Padding(0, 1)
-
-	styleModeYank = lipgloss.NewStyle().
-			Foreground(colorBg).
-			Background(colorGreen).
-			Bold(true).
-			Padding(0, 1)
-
-	// Modal (confirm-delete overlay)
-	colorDanger = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
-
+	// Modal containers (confirm-delete / yank / goto overlays)
 	styleModal = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(colorDanger).
@@ -114,51 +110,14 @@ var (
 			BorderForeground(colorYellow).
 			Padding(1, 3)
 
-	styleModalTitle = lipgloss.NewStyle().
-			Foreground(colorDanger).
-			Bold(true)
+	// Modal title text
+	styleModalTitle     = lipgloss.NewStyle().Foreground(colorDanger).Bold(true)
+	styleModalYankTitle = lipgloss.NewStyle().Foreground(colorCyan).Bold(true)
+	styleModalGotoTitle = lipgloss.NewStyle().Foreground(colorYellow).Bold(true)
 
-	styleModalYankTitle = lipgloss.NewStyle().
-				Foreground(colorCyan).
-				Bold(true)
-
-	styleModalGotoTitle = lipgloss.NewStyle().
-				Foreground(colorYellow).
-				Bold(true)
-
-	styleModalKey = lipgloss.NewStyle().
-			Foreground(colorBg).
-			Background(colorDanger).
-			Bold(true).
-			Padding(0, 1)
-
-	styleModalKeyYank = lipgloss.NewStyle().
-				Foreground(colorBg).
-				Background(colorCyan).
-				Bold(true).
-				Padding(0, 1)
-
-	styleModalKeyGoto = lipgloss.NewStyle().
-				Foreground(colorBg).
-				Background(colorYellow).
-				Bold(true).
-				Padding(0, 1)
-
-	styleModalKeyCancel = lipgloss.NewStyle().
-				Foreground(colorBg).
-				Background(colorDim).
-				Bold(true).
-				Padding(0, 1)
-
-	styleModeConfirmDelete = lipgloss.NewStyle().
-				Foreground(colorBg).
-				Background(colorDanger).
-				Bold(true).
-				Padding(0, 1)
-
-	styleModeGoto = lipgloss.NewStyle().
-			Foreground(colorBg).
-			Background(colorYellow).
-			Bold(true).
-			Padding(0, 1)
+	// Modal key badges (action keys rendered inside modals)
+	styleModalKey       = styleBadgeBase.Background(colorDanger)
+	styleModalKeyYank   = styleBadgeBase.Background(colorCyan)
+	styleModalKeyGoto   = styleBadgeBase.Background(colorYellow)
+	styleModalKeyCancel = styleBadgeBase.Background(colorDim)
 )
