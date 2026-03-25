@@ -198,7 +198,9 @@ func (m model) yankCmd(text string) tea.Cmd {
 			c = exec.Command("xclip", "-selection", "clipboard")
 		}
 		c.Stdin = strings.NewReader(text)
-		_ = c.Run() // silent on failure
+		if err := c.Run(); err != nil {
+			return opErrMsg{err: err}
+		}
 		return yankDoneMsg{}
 	}
 }
