@@ -157,6 +157,9 @@ func (m model) openSessionCmd(id, dir string) tea.Cmd {
 	c := exec.Command("opencode", "--session", id)
 	c.Dir = dir
 	return tea.ExecProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return opErrMsg{err: err}
+		}
 		return sessionOpenedMsg{}
 	})
 }
@@ -176,6 +179,9 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	home, _ := os.UserHomeDir()
 	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, home))
 	return tea.Sequence(tea.Println(notice), tea.ExecProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return opErrMsg{err: err}
+		}
 		return shellExitedMsg{}
 	}))
 }
