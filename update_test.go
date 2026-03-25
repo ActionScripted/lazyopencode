@@ -29,6 +29,17 @@ func keyMsg(s string) tea.KeyMsg {
 	}
 }
 
+// mustModel asserts that m is a model and returns it. Fails the test cleanly
+// (via t.Fatalf) rather than panicking on a bad type assertion.
+func mustModel(t *testing.T, m tea.Model) model {
+	t.Helper()
+	got, ok := m.(model)
+	if !ok {
+		t.Fatalf("expected tea.Model to be model, got %T", m)
+	}
+	return got
+}
+
 // modelWithWorkspaces returns a model seeded with sessions spread across the
 // given directories. workspaceCursor starts at 0, mode is ModeWorkspaces.
 func modelWithWorkspaces(dirs ...string) model {
@@ -103,7 +114,7 @@ func TestUpdateWorkspaces_CursorMovement(t *testing.T) {
 			m := modelWithWorkspaces(tc.dirs...)
 			m.workspaceCursor = tc.startAt
 			result, _ := m.updateWorkspaces(keyMsg(tc.key))
-			got := result.(model).workspaceCursor
+			got := mustModel(t, result).workspaceCursor
 			if got != tc.wantCursor {
 				t.Errorf("cursor after %q: got %d, want %d", tc.key, got, tc.wantCursor)
 			}
@@ -115,7 +126,7 @@ func TestUpdateWorkspaces_WReturnsNormalMode(t *testing.T) {
 	m := modelWithWorkspaces("/tmp/a")
 
 	result, _ := m.updateWorkspaces(keyMsg("w"))
-	got := result.(model).mode
+	got := mustModel(t, result).mode
 	if got != ModeNormal {
 		t.Errorf("mode after w: got %v, want ModeNormal", got)
 	}
@@ -125,7 +136,7 @@ func TestUpdateWorkspaces_EscReturnsNormalMode(t *testing.T) {
 	m := modelWithWorkspaces("/tmp/a")
 
 	result, _ := m.updateWorkspaces(keyMsg("esc"))
-	got := result.(model).mode
+	got := mustModel(t, result).mode
 	if got != ModeNormal {
 		t.Errorf("mode after esc: got %v, want ModeNormal", got)
 	}
@@ -136,7 +147,7 @@ func TestUpdateWorkspaces_DeleteSetsPendingAndMode(t *testing.T) {
 	m.workspaceCursor = 1
 
 	result, _ := m.updateWorkspaces(keyMsg("d"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.mode != ModeConfirmDeleteWorkspace {
 		t.Errorf("mode: got %v, want ModeConfirmDeleteWorkspace", rm.mode)
@@ -152,7 +163,7 @@ func TestUpdateWorkspaces_DeleteWithEmptyWorkspacesNoOp(t *testing.T) {
 	// workspaces is empty
 
 	result, _ := m.updateWorkspaces(keyMsg("d"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.mode != ModeWorkspaces {
 		t.Errorf("mode should stay ModeWorkspaces, got %v", rm.mode)
@@ -172,7 +183,7 @@ func TestUpdateNormal_DownMovesCursor(t *testing.T) {
 		makeSession("2", "B", "/b"),
 	)
 	result, _ := m.updateNormal(keyMsg("j"))
-	got := result.(model).cursor
+	got := mustModel(t, result).cursor
 	if got != 1 {
 		t.Errorf("cursor after j: got %d, want 1", got)
 	}
@@ -181,7 +192,7 @@ func TestUpdateNormal_DownMovesCursor(t *testing.T) {
 func TestUpdateNormal_UpClampsAtTop(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("k"))
-	got := result.(model).cursor
+	got := mustModel(t, result).cursor
 	if got != 0 {
 		t.Errorf("cursor should stay 0, got %d", got)
 	}
@@ -190,7 +201,7 @@ func TestUpdateNormal_UpClampsAtTop(t *testing.T) {
 func TestUpdateNormal_DownClampsAtBottom(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("j"))
-	got := result.(model).cursor
+	got := mustModel(t, result).cursor
 	if got != 0 {
 		t.Errorf("cursor should stay 0, got %d", got)
 	}
@@ -199,24 +210,27 @@ func TestUpdateNormal_DownClampsAtBottom(t *testing.T) {
 func TestUpdateNormal_SearchEntersSearchMode(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("/"))
-	if result.(model).mode != ModeSearch {
-		t.Errorf("expected ModeSearch, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeSearch {
+		t.Errorf("expected ModeSearch, got %v", rm.mode)
 	}
 }
 
 func TestUpdateNormal_WEntersWorkspacesMode(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("w"))
-	if result.(model).mode != ModeWorkspaces {
-		t.Errorf("expected ModeWorkspaces, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeWorkspaces {
+		t.Errorf("expected ModeWorkspaces, got %v", rm.mode)
 	}
 }
 
 func TestUpdateNormal_YEntersYankMode(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("y"))
-	if result.(model).mode != ModeYank {
-		t.Errorf("expected ModeYank, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeYank {
+		t.Errorf("expected ModeYank, got %v", rm.mode)
 	}
 }
 
@@ -224,16 +238,18 @@ func TestUpdateNormal_YNoopWhenEmpty(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 	m.mode = ModeNormal
 	result, _ := m.updateNormal(keyMsg("y"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("mode should stay ModeNormal, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("mode should stay ModeNormal, got %v", rm.mode)
 	}
 }
 
 func TestUpdateNormal_GEntersGotoMode(t *testing.T) {
 	m := modelWithSessions(makeSession("1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("g"))
-	if result.(model).mode != ModeGoto {
-		t.Errorf("expected ModeGoto, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeGoto {
+		t.Errorf("expected ModeGoto, got %v", rm.mode)
 	}
 }
 
@@ -241,15 +257,16 @@ func TestUpdateNormal_GNoopWhenEmpty(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 	m.mode = ModeNormal
 	result, _ := m.updateNormal(keyMsg("g"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("mode should stay ModeNormal, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("mode should stay ModeNormal, got %v", rm.mode)
 	}
 }
 
 func TestUpdateNormal_DeleteSetsPendingAndMode(t *testing.T) {
 	m := modelWithSessions(makeSession("sess-1", "A", "/a"))
 	result, _ := m.updateNormal(keyMsg("d"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeConfirmDelete {
 		t.Errorf("mode: got %v, want ModeConfirmDelete", rm.mode)
 	}
@@ -262,7 +279,7 @@ func TestUpdateNormal_DeleteNoopWhenEmpty(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 	m.mode = ModeNormal
 	result, _ := m.updateNormal(keyMsg("d"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode should stay ModeNormal, got %v", rm.mode)
 	}
@@ -283,7 +300,7 @@ func TestUpdateNormal_EscClearsSearch(t *testing.T) {
 	m.search.SetValue("login")
 
 	result, _ := m.updateNormal(keyMsg("esc"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.search.Value() != "" {
 		t.Errorf("search value: got %q, want empty", rm.search.Value())
@@ -298,7 +315,7 @@ func TestUpdateNormal_EscNoopWhenSearchEmpty(t *testing.T) {
 	m.mode = ModeNormal
 
 	result, _ := m.updateNormal(keyMsg("esc"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.mode != ModeNormal {
 		t.Errorf("mode should stay ModeNormal, got %v", rm.mode)
@@ -318,7 +335,7 @@ func TestUpdateConfirmDelete_CancelClearsState(t *testing.T) {
 	m.mode = ModeConfirmDelete
 
 	result, _ := m.updateConfirmDelete(keyMsg("n"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
 	}
@@ -336,7 +353,7 @@ func TestUpdateConfirmDelete_ConfirmRemovesSessionOptimistically(t *testing.T) {
 	m.mode = ModeConfirmDelete
 
 	result, _ := m.updateConfirmDelete(keyMsg("y"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
@@ -359,7 +376,7 @@ func TestUpdateConfirmDelete_ConfirmEmptyIDNoOp(t *testing.T) {
 	m.mode = ModeConfirmDelete
 
 	result, cmd := m.updateConfirmDelete(keyMsg("y"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
 	}
@@ -378,7 +395,7 @@ func TestUpdateConfirmDeleteWorkspace_CancelClearsState(t *testing.T) {
 	m.mode = ModeConfirmDeleteWorkspace
 
 	result, _ := m.updateConfirmDeleteWorkspace(keyMsg("n"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeWorkspaces {
 		t.Errorf("mode: got %v, want ModeWorkspaces", rm.mode)
 	}
@@ -401,7 +418,7 @@ func TestUpdateConfirmDeleteWorkspace_ConfirmRemovesSessionsOptimistically(t *te
 	m.pendingDeleteWorkspace = "/tmp/ws"
 
 	result, _ := m.updateConfirmDeleteWorkspace(keyMsg("y"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 
 	if rm.mode != ModeWorkspaces {
 		t.Errorf("mode: got %v, want ModeWorkspaces", rm.mode)
@@ -429,7 +446,7 @@ func TestUpdateConfirmDeleteWorkspace_ConfirmEmptyWSNoOp(t *testing.T) {
 	m.mode = ModeConfirmDeleteWorkspace
 
 	result, cmd := m.updateConfirmDeleteWorkspace(keyMsg("y"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeWorkspaces {
 		t.Errorf("mode: got %v, want ModeWorkspaces", rm.mode)
 	}
@@ -448,7 +465,7 @@ func TestUpdateSearch_EscReturnsNormalMode(t *testing.T) {
 	m.search.Focus()
 
 	result, _ := m.updateSearch(keyMsg("esc"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
 	}
@@ -460,7 +477,7 @@ func TestUpdateSearch_EnterReturnsNormalMode(t *testing.T) {
 	m.search.Focus()
 
 	result, _ := m.updateSearch(keyMsg("enter"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
 	}
@@ -482,7 +499,7 @@ func TestUpdateSearch_TypingFilters(t *testing.T) {
 	// is that updateSearch passes the search value through to filtered.
 	// Simulate a rune keystroke for "l".
 	result, _ := m.updateSearch(keyMsg("l"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	// filtered should now only contain sessions matching "l".
 	for _, s := range rm.filtered {
 		if !strings.Contains(strings.ToLower(s.FilterValue()), "l") {
@@ -500,8 +517,9 @@ func TestUpdateGoto_EscReturnsNormalMode(t *testing.T) {
 	m.mode = ModeGoto
 
 	result, _ := m.updateGoto(keyMsg("esc"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("expected ModeNormal, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal, got %v", rm.mode)
 	}
 }
 
@@ -510,7 +528,7 @@ func TestUpdateGoto_WEntersWorkspacesMode(t *testing.T) {
 	m.mode = ModeGoto
 
 	result, _ := m.updateGoto(keyMsg("w"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeWorkspaces {
 		t.Errorf("expected ModeWorkspaces, got %v", rm.mode)
 	}
@@ -529,7 +547,7 @@ func TestUpdateGoto_WJumpsToCorrectWorkspaceCursor(t *testing.T) {
 	m.mode = ModeGoto
 
 	result, _ := m.updateGoto(keyMsg("w"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	// /tmp/zzz is index 1 in sorted workspaces (/tmp/aaa, /tmp/zzz)
 	if rm.workspaceCursor != 1 {
 		t.Errorf("workspaceCursor: got %d, want 1", rm.workspaceCursor)
@@ -542,8 +560,9 @@ func TestUpdateGoto_EmptyFilteredFallsBackToNormal(t *testing.T) {
 	// filtered is empty
 
 	result, _ := m.updateGoto(keyMsg("w"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("expected ModeNormal when filtered is empty, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal when filtered is empty, got %v", rm.mode)
 	}
 }
 
@@ -556,8 +575,9 @@ func TestUpdateYank_EscReturnsNormalMode(t *testing.T) {
 	m.mode = ModeYank
 
 	result, _ := m.updateYank(keyMsg("esc"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("expected ModeNormal, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal, got %v", rm.mode)
 	}
 }
 
@@ -568,7 +588,7 @@ func TestUpdateYank_DReturnsNormalMode(t *testing.T) {
 	m.mode = ModeYank
 
 	result, cmd := m.updateYank(keyMsg("d"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("expected ModeNormal, got %v", rm.mode)
 	}
@@ -582,7 +602,7 @@ func TestUpdateYank_SReturnsNormalMode(t *testing.T) {
 	m.mode = ModeYank
 
 	result, cmd := m.updateYank(keyMsg("s"))
-	rm := result.(model)
+	rm := mustModel(t, result)
 	if rm.mode != ModeNormal {
 		t.Errorf("expected ModeNormal, got %v", rm.mode)
 	}
@@ -596,7 +616,8 @@ func TestUpdateYank_EmptyFilteredFallsBackToNormal(t *testing.T) {
 	m.mode = ModeYank
 
 	result, _ := m.updateYank(keyMsg("d"))
-	if result.(model).mode != ModeNormal {
-		t.Errorf("expected ModeNormal when filtered is empty, got %v", result.(model).mode)
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal when filtered is empty, got %v", rm.mode)
 	}
 }
