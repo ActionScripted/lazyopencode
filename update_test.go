@@ -271,6 +271,43 @@ func TestUpdateNormal_DeleteNoopWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestUpdateNormal_EscClearsSearch(t *testing.T) {
+	sessions := []Session{
+		makeSession("1", "Fix login", "/a"),
+		makeSession("2", "Refactor DB", "/b"),
+	}
+	m := newModel("/tmp/fake.db", true)
+	m.sessions = sessions
+	m.filtered = filterSessions(sessions, "login")
+	m.mode = ModeNormal
+	m.search.SetValue("login")
+
+	result, _ := m.updateNormal(keyMsg("esc"))
+	rm := result.(model)
+
+	if rm.search.Value() != "" {
+		t.Errorf("search value: got %q, want empty", rm.search.Value())
+	}
+	if len(rm.filtered) != len(sessions) {
+		t.Errorf("filtered len: got %d, want %d", len(rm.filtered), len(sessions))
+	}
+}
+
+func TestUpdateNormal_EscNoopWhenSearchEmpty(t *testing.T) {
+	m := modelWithSessions(makeSession("1", "A", "/a"))
+	m.mode = ModeNormal
+
+	result, _ := m.updateNormal(keyMsg("esc"))
+	rm := result.(model)
+
+	if rm.mode != ModeNormal {
+		t.Errorf("mode should stay ModeNormal, got %v", rm.mode)
+	}
+	if rm.search.Value() != "" {
+		t.Errorf("search value should stay empty, got %q", rm.search.Value())
+	}
+}
+
 // ---------------------------------------------------------------------------
 // updateConfirmDelete
 // ---------------------------------------------------------------------------
@@ -411,6 +448,18 @@ func TestUpdateSearch_EscReturnsNormalMode(t *testing.T) {
 	m.search.Focus()
 
 	result, _ := m.updateSearch(keyMsg("esc"))
+	rm := result.(model)
+	if rm.mode != ModeNormal {
+		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
+	}
+}
+
+func TestUpdateSearch_EnterReturnsNormalMode(t *testing.T) {
+	m := modelWithSessions(makeSession("1", "A", "/a"))
+	m.mode = ModeSearch
+	m.search.Focus()
+
+	result, _ := m.updateSearch(keyMsg("enter"))
 	rm := result.(model)
 	if rm.mode != ModeNormal {
 		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
