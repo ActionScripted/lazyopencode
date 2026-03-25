@@ -40,8 +40,14 @@ type shellExitedMsg struct{}
 // yankDoneMsg signals that the yank command completed (success or silent failure).
 type yankDoneMsg struct{}
 
-// errMsg carries a non-fatal error to display in the UI.
-type errMsg struct {
+// dbErrMsg carries a fatal database error that transitions the app to ModeError.
+type dbErrMsg struct {
+	err error
+}
+
+// opErrMsg carries a transient operation error (e.g. delete failure) to display
+// briefly in the hint bar without terminating the session.
+type opErrMsg struct {
 	err error
 }
 
@@ -57,6 +63,7 @@ type model struct {
 	dbPath                 string
 	demoMode               bool
 	err                    error
+	notice                 string        // transient operation error; cleared on next keypress
 	messages               []Message     // messages for currently selected session; nil = loading
 	stats                  *SessionStats // stats for currently selected session; nil = loading
 	previewSessionID       string        // session ID whose messages are loaded
@@ -91,7 +98,7 @@ func (m model) loadSessionsCmd() tea.Cmd {
 	return func() tea.Msg {
 		sessions, err := loadSessions(m.dbPath)
 		if err != nil {
-			return errMsg{err: err}
+			return dbErrMsg{err: err}
 		}
 		return sessionsLoadedMsg{sessions: sessions}
 	}
@@ -196,7 +203,7 @@ func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 	}
 	return func() tea.Msg {
 		if err := deleteOneSession(sessionID); err != nil {
-			return errMsg{err: err}
+			return opErrMsg{err: err}
 		}
 		return sessionDeletedMsg{}
 	}
@@ -212,7 +219,7 @@ func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
 	return func() tea.Msg {
 		for _, id := range ids {
 			if err := deleteOneSession(id); err != nil {
-				return errMsg{err: err}
+				return opErrMsg{err: err}
 			}
 		}
 		return sessionDeletedMsg{}
@@ -300,12 +307,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Nothing to do — clipboard write is fire-and-forget.
 		return m, nil
 
-	case errMsg:
+	case dbErrMsg:
 		m.err = msg.err
 		m.mode = ModeError
 		return m, nil
 
+	case opErrMsg:
+		m.notice = msg.err.Error()
+		return m, nil
+
 	case tea.KeyMsg:
+		m.notice = "" // clear any transient notice on the next keypress
 		switch m.mode {
 		case ModeNormal:
 			return m.updateNormal(msg)

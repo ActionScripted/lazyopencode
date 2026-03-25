@@ -237,7 +237,7 @@ func TestDeleteSessionCmd_SuccessReturnsSessionDeletedMsg(t *testing.T) {
 	}
 }
 
-func TestDeleteSessionCmd_FailureReturnsErrMsg(t *testing.T) {
+func TestDeleteSessionCmd_FailureReturnsOpErrMsg(t *testing.T) {
 	original := runCommand
 	defer func() { runCommand = original }()
 	runCommand = func(name string, args ...string) error {
@@ -247,8 +247,8 @@ func TestDeleteSessionCmd_FailureReturnsErrMsg(t *testing.T) {
 	m := newModel("/tmp/fake.db", false)
 	msg := m.deleteSessionCmd("sess-1")()
 
-	if _, ok := msg.(errMsg); !ok {
-		t.Errorf("expected errMsg, got %T", msg)
+	if _, ok := msg.(opErrMsg); !ok {
+		t.Errorf("expected opErrMsg, got %T", msg)
 	}
 }
 
@@ -284,7 +284,7 @@ func TestDeleteSessionsCmd_SuccessReturnsSessionDeletedMsg(t *testing.T) {
 	}
 }
 
-func TestDeleteSessionsCmd_FailureReturnsErrMsg(t *testing.T) {
+func TestDeleteSessionsCmd_FailureReturnsOpErrMsg(t *testing.T) {
 	original := runCommand
 	defer func() { runCommand = original }()
 	runCommand = func(name string, args ...string) error {
@@ -294,8 +294,8 @@ func TestDeleteSessionsCmd_FailureReturnsErrMsg(t *testing.T) {
 	m := newModel("/tmp/fake.db", false)
 	msg := m.deleteSessionsCmd([]string{"s1", "s2"})()
 
-	if _, ok := msg.(errMsg); !ok {
-		t.Errorf("expected errMsg, got %T", msg)
+	if _, ok := msg.(opErrMsg); !ok {
+		t.Errorf("expected opErrMsg, got %T", msg)
 	}
 }
 

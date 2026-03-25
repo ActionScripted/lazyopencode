@@ -436,21 +436,25 @@ func (m model) renderHint(width int) string {
 		styleHintKey.Bold(true).Render("OpenCode")
 
 	var hints string
-	switch m.mode {
-	case ModeSearch:
-		hints = "  enter/esc: back   type to filter"
-	case ModeWorkspaces:
-		hints = "  j/k: up/down   d: del   w: workspace   q: quit"
-	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
-		hints = "  y/d: confirm   n/esc: cancel"
-	case ModeYank:
-		hints = "  d: directory   s: session id   esc: cancel"
-	case ModeGoto:
-		hints = "  s: shell   w: workspace   esc: cancel"
-	case ModeError:
-		hints = "  q: quit"
-	default:
-		hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
+	if m.notice != "" {
+		hints = "  " + m.notice
+	} else {
+		switch m.mode {
+		case ModeSearch:
+			hints = "  enter/esc: back   type to filter"
+		case ModeWorkspaces:
+			hints = "  j/k: up/down   d: del   w: workspace   q: quit"
+		case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
+			hints = "  y/d: confirm   n/esc: cancel"
+		case ModeYank:
+			hints = "  d: directory   s: session id   esc: cancel"
+		case ModeGoto:
+			hints = "  s: shell   w: workspace   esc: cancel"
+		case ModeError:
+			hints = "  q: quit"
+		default:
+			hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
+		}
 	}
 	dots := "  " +
 		lipgloss.NewStyle().Foreground(colorBlue).Render("•") +
