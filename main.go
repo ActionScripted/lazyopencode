@@ -18,15 +18,15 @@ func main() {
 
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
-		fmt.Fprintf(w, "Usage: lazyopencode [flags]\n\n")                                //nolint:errcheck
-		fmt.Fprintf(w, "A terminal UI for browsing and managing opencode sessions.\n\n") //nolint:errcheck
-		fmt.Fprintf(w, "Flags:\n")                                                       //nolint:errcheck
+		fmt.Fprintf(w, "Usage: lazyopencode [flags]\n\n")                                //nolint:errcheck // writing usage to stderr; failure is not actionable
+		fmt.Fprintf(w, "A terminal UI for browsing and managing opencode sessions.\n\n") //nolint:errcheck // writing usage to stderr; failure is not actionable
+		fmt.Fprintf(w, "Flags:\n")                                                       //nolint:errcheck // writing usage to stderr; failure is not actionable
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(tw, "  --help\tshow this help message\n") //nolint:errcheck
-		flag.VisitAll(func(f *flag.Flag) {                    //nolint:errcheck
-			fmt.Fprintf(tw, "  --%s\t%s\n", f.Name, f.Usage) //nolint:errcheck
+		fmt.Fprintf(tw, "  --help\tshow this help message\n") //nolint:errcheck // writing usage to stderr; failure is not actionable
+		flag.VisitAll(func(f *flag.Flag) {                    //nolint:errcheck // VisitAll signature does not return an error
+			fmt.Fprintf(tw, "  --%s\t%s\n", f.Name, f.Usage) //nolint:errcheck // writing usage to stderr; failure is not actionable
 		})
-		tw.Flush() //nolint:errcheck
+		tw.Flush() //nolint:errcheck // flushing usage output to stderr; failure is not actionable
 	}
 
 	flag.Parse()
