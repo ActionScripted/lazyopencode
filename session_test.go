@@ -86,7 +86,7 @@ func TestFilterSessions_PartialMidString(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBuildWorkspaces_Empty(t *testing.T) {
-	ws := buildWorkspaces(nil)
+	ws := buildWorkspaces(nil, "")
 	if len(ws) != 0 {
 		t.Errorf("expected empty slice, got %d workspaces", len(ws))
 	}
@@ -98,7 +98,7 @@ func TestBuildWorkspaces_Deduplicates(t *testing.T) {
 		makeSession("2", "B", "/tmp/proj"),
 		makeSession("3", "C", "/tmp/proj"),
 	}
-	ws := buildWorkspaces(sessions)
+	ws := buildWorkspaces(sessions, "")
 	if len(ws) != 1 {
 		t.Fatalf("expected 1 workspace, got %d", len(ws))
 	}
@@ -113,7 +113,7 @@ func TestBuildWorkspaces_SortedByDir(t *testing.T) {
 		makeSession("2", "B", "/tmp/aaa"),
 		makeSession("3", "C", "/tmp/mmm"),
 	}
-	ws := buildWorkspaces(sessions)
+	ws := buildWorkspaces(sessions, "")
 	if len(ws) != 3 {
 		t.Fatalf("expected 3 workspaces, got %d", len(ws))
 	}
@@ -131,7 +131,7 @@ func TestBuildWorkspaces_DisplayDirSubstituted(t *testing.T) {
 	dir := filepath.Join(home, "projects", "lazyopencode")
 	sessions := []Session{makeSession("1", "A", dir)}
 
-	ws := buildWorkspaces(sessions)
+	ws := buildWorkspaces(sessions, home)
 	if len(ws) != 1 {
 		t.Fatalf("expected 1 workspace, got %d", len(ws))
 	}
@@ -193,7 +193,7 @@ func TestHomeToTilde(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := homeToTilde(tc.in)
+			got := homeToTilde(tc.in, home)
 			if got != tc.want {
 				t.Errorf("homeToTilde(%q) = %q, want %q", tc.in, got, tc.want)
 			}
@@ -206,7 +206,7 @@ func TestHomeToTilde(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBaseName_LastComponent(t *testing.T) {
-	got := baseName("/home/user/projects/myapp")
+	got := baseName("/home/user/projects/myapp", "/home/user")
 	if got != "myapp" {
 		t.Errorf("got %q, want %q", got, "myapp")
 	}
@@ -214,7 +214,7 @@ func TestBaseName_LastComponent(t *testing.T) {
 
 func TestBaseName_HomeDir(t *testing.T) {
 	home, _ := os.UserHomeDir()
-	got := baseName(home)
+	got := baseName(home, home)
 	if got != "~" {
 		t.Errorf("got %q, want %q", got, "~")
 	}

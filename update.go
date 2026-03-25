@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -169,7 +171,8 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.sessions = removeSessionByID(m.sessions, id)
 			m.filtered = removeSessionByID(m.filtered, id)
 		}
-		m.workspaces = buildWorkspaces(m.sessions)
+		home, _ := os.UserHomeDir()
+		m.workspaces = buildWorkspaces(m.sessions, home)
 		m.workspaceCursor = clamp(m.workspaceCursor, 0, max(0, len(m.workspaces)-1))
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
@@ -199,7 +202,8 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Optimistic removal.
 		m.sessions = removeSessionByID(m.sessions, id)
 		m.filtered = removeSessionByID(m.filtered, id)
-		m.workspaces = buildWorkspaces(m.sessions)
+		home, _ := os.UserHomeDir()
+		m.workspaces = buildWorkspaces(m.sessions, home)
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
 		var cmd tea.Cmd

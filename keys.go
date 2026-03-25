@@ -1,6 +1,10 @@
 package main
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/bubbles/key"
+)
 
 // Mode represents the current input mode.
 type Mode int
@@ -15,6 +19,30 @@ const (
 	ModeGoto
 	ModeError
 )
+
+// String returns a human-readable name for the mode, used in logs and errors.
+func (m Mode) String() string {
+	switch m {
+	case ModeNormal:
+		return "Normal"
+	case ModeSearch:
+		return "Search"
+	case ModeWorkspaces:
+		return "Workspaces"
+	case ModeConfirmDelete:
+		return "ConfirmDelete"
+	case ModeConfirmDeleteWorkspace:
+		return "ConfirmDeleteWorkspace"
+	case ModeYank:
+		return "Yank"
+	case ModeGoto:
+		return "Goto"
+	case ModeError:
+		return "Error"
+	default:
+		return fmt.Sprintf("Mode(%d)", m)
+	}
+}
 
 // KeyMap holds all named key bindings for the application.
 type KeyMap struct {

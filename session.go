@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -62,16 +61,16 @@ func (s Session) ShortDirectory() string {
 }
 
 // homeToTilde replaces the home directory prefix with "~" in the given path.
+// home must be the result of os.UserHomeDir, resolved once by the caller.
 // Called once at load time to populate Session.DisplayDir.
-func homeToTilde(dir string) string {
-	home, _ := os.UserHomeDir()
+func homeToTilde(dir, home string) string {
 	return strings.Replace(dir, home, "~", 1)
 }
 
-// baseName returns just the last path component of dir, or "~" if dir is the
-// user's home directory. Called once at load time to populate Session.ShortDir.
-func baseName(dir string) string {
-	home, _ := os.UserHomeDir()
+// baseName returns just the last path component of dir, or "~" if dir equals
+// home. home must be the result of os.UserHomeDir, resolved once by the caller.
+// Called once at load time to populate Session.ShortDir.
+func baseName(dir, home string) string {
 	if dir == home {
 		return "~"
 	}
@@ -95,16 +94,17 @@ func filterSessions(sessions []Session, query string) []Session {
 }
 
 // buildWorkspaces returns a sorted, deduplicated list of workspace values from
-// the given sessions. DisplayDir is pre-computed once here to avoid calling
+// the given sessions. home must be the result of os.UserHomeDir, resolved once
+// by the caller. DisplayDir is pre-computed once here to avoid calling
 // os.UserHomeDir on every render frame.
-func buildWorkspaces(sessions []Session) []workspace {
+func buildWorkspaces(sessions []Session, home string) []workspace {
 	seen := make(map[string]struct{}, len(sessions))
 	for _, s := range sessions {
 		seen[s.Directory] = struct{}{}
 	}
 	ws := make([]workspace, 0, len(seen))
 	for dir := range seen {
-		ws = append(ws, workspace{Dir: dir, DisplayDir: homeToTilde(dir)})
+		ws = append(ws, workspace{Dir: dir, DisplayDir: homeToTilde(dir, home)})
 	}
 	sort.Slice(ws, func(i, j int) bool { return ws[i].Dir < ws[j].Dir })
 	return ws

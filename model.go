@@ -166,7 +166,8 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	}
 	c := exec.Command(shell)
 	c.Dir = dir
-	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir))
+	home, _ := os.UserHomeDir()
+	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, home))
 	return tea.Sequence(tea.Println(notice), tea.ExecProcess(c, func(err error) tea.Msg {
 		return shellExitedMsg{}
 	}))
@@ -248,7 +249,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
-		m.workspaces = buildWorkspaces(m.sessions)
+		home, _ := os.UserHomeDir()
+		m.workspaces = buildWorkspaces(m.sessions, home)
 		m.cursor = 0
 		m.workspaceCursor = 0
 		for i, ws := range m.workspaces {

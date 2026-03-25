@@ -9,7 +9,7 @@ var (
 	colorDim      = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
 	colorCyan     = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
 	colorBlue     = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
-	colorBg       = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
+	colorOnBadge  = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
 	colorBgPanel  = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
 	colorSelected = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
 	colorBorder   = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
@@ -87,7 +87,7 @@ var (
 	// Badge base: shared foundation for all mode badges and modal key badges.
 	// Each specific badge derives from this by setting its Background color.
 	styleBadgeBase = lipgloss.NewStyle().
-			Foreground(colorBg).
+			Foreground(colorOnBadge).
 			Bold(true).
 			Padding(0, 1)
 

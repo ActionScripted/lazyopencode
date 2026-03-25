@@ -54,7 +54,7 @@ func modelWithWorkspaces(dirs ...string) model {
 	m := newModel("/tmp/fake.db", true)
 	m.sessions = sessions
 	m.filtered = sessions
-	m.workspaces = buildWorkspaces(sessions)
+	m.workspaces = buildWorkspaces(sessions, "")
 	m.mode = ModeWorkspaces
 	return m
 }
@@ -64,7 +64,7 @@ func modelWithSessions(sessions ...Session) model {
 	m := newModel("/tmp/fake.db", true)
 	m.sessions = sessions
 	m.filtered = sessions
-	m.workspaces = buildWorkspaces(sessions)
+	m.workspaces = buildWorkspaces(sessions, "")
 	m.mode = ModeNormal
 	return m
 }
@@ -413,7 +413,7 @@ func TestUpdateConfirmDeleteWorkspace_ConfirmRemovesSessionsOptimistically(t *te
 	m := newModel("/tmp/fake.db", true)
 	m.sessions = sessions
 	m.filtered = sessions
-	m.workspaces = buildWorkspaces(sessions)
+	m.workspaces = buildWorkspaces(sessions, "")
 	m.mode = ModeConfirmDeleteWorkspace
 	m.pendingDeleteWorkspace = "/tmp/ws"
 
@@ -542,7 +542,7 @@ func TestUpdateGoto_WJumpsToCorrectWorkspaceCursor(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 	m.sessions = sessions
 	m.filtered = sessions
-	m.workspaces = buildWorkspaces(sessions)
+	m.workspaces = buildWorkspaces(sessions, "")
 	m.cursor = 1 // selected session is in /tmp/zzz
 	m.mode = ModeGoto
 

@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -37,6 +38,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 	}
 	defer func() { _ = db.Close() }()
 
+	home, _ := os.UserHomeDir()
+
 	rows, err := db.Query(`
 		SELECT id, title, directory,
 		       time_created, time_updated,
@@ -65,8 +68,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 		}
 		s.CreatedAt = time.Unix(createdMS/1000, 0)
 		s.UpdatedAt = time.Unix(updatedMS/1000, 0)
-		s.DisplayDir = homeToTilde(s.Directory)
-		s.ShortDir = baseName(s.Directory)
+		s.DisplayDir = homeToTilde(s.Directory, home)
+		s.ShortDir = baseName(s.Directory, home)
 		sessions = append(sessions, s)
 	}
 	if err := rows.Err(); err != nil {
