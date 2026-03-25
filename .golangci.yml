@@ -6,6 +6,7 @@ linters:
     - errcheck
     - govet
     - misspell
+    - nolintlint
     - revive
     - staticcheck
     - unused
@@ -16,6 +17,11 @@ linters:
         - name: exported
           disabled: true
     errcheck: {}
+    nolintlint:
+      # Every //nolint directive must name the specific linter being suppressed
+      require-specific: true
+      # Every //nolint directive must include a justification comment after the linter name
+      require-explanation: true
   exclusions:
     rules:
       # errcheck is noisy in test files
