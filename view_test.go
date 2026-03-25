@@ -112,19 +112,31 @@ func TestRenderHintSegments_BareSegmentNoColon(t *testing.T) {
 	}
 }
 
-// stripANSI removes ANSI escape sequences from s for plain-text assertions.
+// stripANSI removes ANSI/VT100 escape sequences from s for plain-text
+// assertions. It handles both CSI sequences (ESC [ ... <final>) and simple
+// two-byte ESC sequences (ESC <char>).
 func stripANSI(s string) string {
 	var b strings.Builder
-	inEsc := false
-	for _, r := range s {
-		switch {
-		case r == '\x1b':
-			inEsc = true
-		case inEsc && r == 'm':
-			inEsc = false
-		case !inEsc:
-			b.WriteRune(r)
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] != '\x1b' {
+			b.WriteRune(runes[i])
+			continue
 		}
+		// ESC: peek at the next character.
+		i++
+		if i >= len(runes) {
+			break
+		}
+		if runes[i] == '[' {
+			// CSI sequence: consume until a byte in 0x40–0x7E (the final byte).
+			i++
+			for i < len(runes) && (runes[i] < 0x40 || runes[i] > 0x7E) {
+				i++
+			}
+			// i now points at the final byte; the outer loop will i++ past it.
+		}
+		// Any other ESC <char> pair is consumed by the outer i++ above.
 	}
 	return b.String()
 }

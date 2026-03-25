@@ -144,49 +144,35 @@ func TestBuildWorkspaces_DisplayDirSubstituted(t *testing.T) {
 // removeSessionByID
 // ---------------------------------------------------------------------------
 
-func TestRemoveSessionByID_RemovesMatch(t *testing.T) {
+func TestRemoveSessionByID(t *testing.T) {
 	sessions := []Session{
 		makeSession("1", "A", "/a"),
 		makeSession("2", "B", "/b"),
 		makeSession("3", "C", "/c"),
 	}
-	got := removeSessionByID(sessions, "2")
-	if len(got) != 2 {
-		t.Fatalf("expected 2 sessions, got %d", len(got))
+	tests := []struct {
+		name    string
+		input   []Session
+		id      string
+		wantIDs []string
+	}{
+		{"removes match", sessions, "2", []string{"1", "3"}},
+		{"leaves others intact", sessions[:2], "1", []string{"2"}},
+		{"noop on missing id", sessions[:2], "999", []string{"1", "2"}},
+		{"empty input", nil, "1", nil},
 	}
-	for _, s := range got {
-		if s.ID == "2" {
-			t.Error("session 2 should have been removed")
-		}
-	}
-}
-
-func TestRemoveSessionByID_LeavesOthersIntact(t *testing.T) {
-	sessions := []Session{
-		makeSession("1", "A", "/a"),
-		makeSession("2", "B", "/b"),
-	}
-	got := removeSessionByID(sessions, "1")
-	if len(got) != 1 || got[0].ID != "2" {
-		t.Errorf("expected only session 2, got %v", got)
-	}
-}
-
-func TestRemoveSessionByID_NoopOnMissingID(t *testing.T) {
-	sessions := []Session{
-		makeSession("1", "A", "/a"),
-		makeSession("2", "B", "/b"),
-	}
-	got := removeSessionByID(sessions, "999")
-	if len(got) != 2 {
-		t.Errorf("expected 2 sessions unchanged, got %d", len(got))
-	}
-}
-
-func TestRemoveSessionByID_EmptyInput(t *testing.T) {
-	got := removeSessionByID(nil, "1")
-	if len(got) != 0 {
-		t.Errorf("expected empty output, got %d sessions", len(got))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := removeSessionByID(tc.input, tc.id)
+			if len(got) != len(tc.wantIDs) {
+				t.Fatalf("got %d sessions, want %d", len(got), len(tc.wantIDs))
+			}
+			for i, s := range got {
+				if s.ID != tc.wantIDs[i] {
+					t.Errorf("got[%d].ID = %q, want %q", i, s.ID, tc.wantIDs[i])
+				}
+			}
+		})
 	}
 }
 
@@ -194,29 +180,24 @@ func TestRemoveSessionByID_EmptyInput(t *testing.T) {
 // homeToTilde
 // ---------------------------------------------------------------------------
 
-func TestHomeToTilde_ReplacesHomePrefix(t *testing.T) {
+func TestHomeToTilde(t *testing.T) {
 	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, "projects", "foo")
-	got := homeToTilde(dir)
-	want := "~/projects/foo"
-	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"replaces home prefix", filepath.Join(home, "projects", "foo"), "~/projects/foo"},
+		{"non-home path unchanged", "/tmp/something", "/tmp/something"},
+		{"exactly home", home, "~"},
 	}
-}
-
-func TestHomeToTilde_NonHomePath(t *testing.T) {
-	path := "/tmp/something"
-	got := homeToTilde(path)
-	if got != path {
-		t.Errorf("got %q, want %q", got, path)
-	}
-}
-
-func TestHomeToTilde_ExactlyHome(t *testing.T) {
-	home, _ := os.UserHomeDir()
-	got := homeToTilde(home)
-	if got != "~" {
-		t.Errorf("got %q, want %q", got, "~")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := homeToTilde(tc.in)
+			if got != tc.want {
+				t.Errorf("homeToTilde(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -236,23 +217,5 @@ func TestBaseName_HomeDir(t *testing.T) {
 	got := baseName(home)
 	if got != "~" {
 		t.Errorf("got %q, want %q", got, "~")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// ShortDirectory / DisplayDirectory
-// ---------------------------------------------------------------------------
-
-func TestShortDirectory(t *testing.T) {
-	s := Session{ShortDir: "myapp"}
-	if got := s.ShortDirectory(); got != "myapp" {
-		t.Errorf("got %q, want %q", got, "myapp")
-	}
-}
-
-func TestDisplayDirectory(t *testing.T) {
-	s := Session{DisplayDir: "~/projects/myapp"}
-	if got := s.DisplayDirectory(); got != "~/projects/myapp" {
-		t.Errorf("got %q, want %q", got, "~/projects/myapp")
 	}
 }

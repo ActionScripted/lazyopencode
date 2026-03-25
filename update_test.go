@@ -48,6 +48,16 @@ func modelWithWorkspaces(dirs ...string) model {
 	return m
 }
 
+// modelWithSessions returns a ModeNormal model seeded with the given sessions.
+func modelWithSessions(sessions ...Session) model {
+	m := newModel("/tmp/fake.db", true)
+	m.sessions = sessions
+	m.filtered = sessions
+	m.workspaces = buildWorkspaces(sessions)
+	m.mode = ModeNormal
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // clamp
 // ---------------------------------------------------------------------------
@@ -75,47 +85,29 @@ func TestClamp(t *testing.T) {
 // updateWorkspaces
 // ---------------------------------------------------------------------------
 
-func TestUpdateWorkspaces_DownMovesCursor(t *testing.T) {
-	m := modelWithWorkspaces("/tmp/a", "/tmp/b", "/tmp/c")
-	m.workspaceCursor = 0
-
-	result, _ := m.updateWorkspaces(keyMsg("j"))
-	got := result.(model).workspaceCursor
-	if got != 1 {
-		t.Errorf("cursor after j: got %d, want 1", got)
+func TestUpdateWorkspaces_CursorMovement(t *testing.T) {
+	tests := []struct {
+		name       string
+		dirs       []string
+		startAt    int
+		key        string
+		wantCursor int
+	}{
+		{"down moves cursor", []string{"/tmp/a", "/tmp/b", "/tmp/c"}, 0, "j", 1},
+		{"up moves cursor", []string{"/tmp/a", "/tmp/b", "/tmp/c"}, 2, "k", 1},
+		{"up clamps at top", []string{"/tmp/a", "/tmp/b"}, 0, "k", 0},
+		{"down clamps at bottom", []string{"/tmp/a", "/tmp/b"}, 1, "j", 1},
 	}
-}
-
-func TestUpdateWorkspaces_UpMovesCursor(t *testing.T) {
-	m := modelWithWorkspaces("/tmp/a", "/tmp/b", "/tmp/c")
-	m.workspaceCursor = 2
-
-	result, _ := m.updateWorkspaces(keyMsg("k"))
-	got := result.(model).workspaceCursor
-	if got != 1 {
-		t.Errorf("cursor after k: got %d, want 1", got)
-	}
-}
-
-func TestUpdateWorkspaces_UpClampsAtTop(t *testing.T) {
-	m := modelWithWorkspaces("/tmp/a", "/tmp/b")
-	m.workspaceCursor = 0
-
-	result, _ := m.updateWorkspaces(keyMsg("k"))
-	got := result.(model).workspaceCursor
-	if got != 0 {
-		t.Errorf("cursor should stay at 0, got %d", got)
-	}
-}
-
-func TestUpdateWorkspaces_DownClampsAtBottom(t *testing.T) {
-	m := modelWithWorkspaces("/tmp/a", "/tmp/b")
-	m.workspaceCursor = 1
-
-	result, _ := m.updateWorkspaces(keyMsg("j"))
-	got := result.(model).workspaceCursor
-	if got != 1 {
-		t.Errorf("cursor should stay at 1, got %d", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := modelWithWorkspaces(tc.dirs...)
+			m.workspaceCursor = tc.startAt
+			result, _ := m.updateWorkspaces(keyMsg(tc.key))
+			got := result.(model).workspaceCursor
+			if got != tc.wantCursor {
+				t.Errorf("cursor after %q: got %d, want %d", tc.key, got, tc.wantCursor)
+			}
+		})
 	}
 }
 
@@ -173,16 +165,6 @@ func TestUpdateWorkspaces_DeleteWithEmptyWorkspacesNoOp(t *testing.T) {
 // ---------------------------------------------------------------------------
 // updateNormal
 // ---------------------------------------------------------------------------
-
-// modelWithSessions returns a ModeNormal model seeded with the given sessions.
-func modelWithSessions(sessions ...Session) model {
-	m := newModel("/tmp/fake.db", true)
-	m.sessions = sessions
-	m.filtered = sessions
-	m.workspaces = buildWorkspaces(sessions)
-	m.mode = ModeNormal
-	return m
-}
 
 func TestUpdateNormal_DownMovesCursor(t *testing.T) {
 	m := modelWithSessions(

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -29,13 +30,8 @@ func TestDeleteOneSession_Success(t *testing.T) {
 		t.Errorf("command name: got %q, want %q", gotName, "opencode")
 	}
 	wantArgs := []string{"session", "delete", "abc-123"}
-	if len(gotArgs) != len(wantArgs) {
-		t.Fatalf("args length: got %d, want %d", len(gotArgs), len(wantArgs))
-	}
-	for i, a := range wantArgs {
-		if gotArgs[i] != a {
-			t.Errorf("arg[%d]: got %q, want %q", i, gotArgs[i], a)
-		}
+	if !slices.Equal(gotArgs, wantArgs) {
+		t.Errorf("args: got %v, want %v", gotArgs, wantArgs)
 	}
 }
 
@@ -74,8 +70,7 @@ func TestOpenSessionCmd_DemoMode(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadSessionsCmd_ReturnsSessionsLoadedMsg(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	insertSession(t, db, "s1", "My Session", "/tmp/proj", 1000000, 2000000, nil)
@@ -113,8 +108,7 @@ func TestLoadSessionsCmd_MissingDBReturnsEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadMessagesCmd_ReturnsMessagesLoadedMsg(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES ('m1', 'sess-1', '{"role":"user"}')`)
@@ -170,8 +164,7 @@ func TestLoadMessagesCmd_ErrorReturnsEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadStatsCmd_ReturnsStatsLoadedMsg(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES ('m1', 'sess-1', '{"role":"user"}')`)

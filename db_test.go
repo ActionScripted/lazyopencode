@@ -11,9 +11,9 @@ import (
 )
 
 // createTestDB creates a temporary SQLite file seeded with the minimal schema
-// that mirrors the opencode database. It returns the file path and a cleanup
-// function. The caller is responsible for calling cleanup.
-func createTestDB(t *testing.T) (string, func()) {
+// that mirrors the opencode database. Cleanup is handled automatically by
+// t.TempDir.
+func createTestDB(t *testing.T) string {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -56,7 +56,7 @@ func createTestDB(t *testing.T) (string, func()) {
 		t.Fatalf("createTestDB: close: %v", err)
 	}
 
-	return path, func() {} // t.TempDir already cleans up on test exit
+	return path
 }
 
 // insertSession adds a single row to the session table.
@@ -100,8 +100,7 @@ func TestOpenReadOnlyDB_MissingFile(t *testing.T) {
 }
 
 func TestOpenReadOnlyDB_ValidFile(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db, missing, err := openReadOnlyDB(path)
 	if err != nil {
@@ -125,8 +124,7 @@ func TestOpenReadOnlyDB_ValidFile(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadSessions_Empty(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	sessions, err := loadSessions(path)
 	if err != nil {
@@ -148,8 +146,7 @@ func TestLoadSessions_MissingDB(t *testing.T) {
 }
 
 func TestLoadSessions_Populated(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, "projects", "myapp")
@@ -200,8 +197,7 @@ func TestLoadSessions_Populated(t *testing.T) {
 }
 
 func TestLoadSessions_ChildSessionsExcluded(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	parentID := "parent-1"
@@ -226,8 +222,7 @@ func TestLoadSessions_ChildSessionsExcluded(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadMessages_EmptySession(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	messages, err := loadMessages(path, "no-such-session")
 	if err != nil {
@@ -239,8 +234,7 @@ func TestLoadMessages_EmptySession(t *testing.T) {
 }
 
 func TestLoadMessages_Populated(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 
@@ -276,8 +270,7 @@ func TestLoadMessages_Populated(t *testing.T) {
 }
 
 func TestLoadMessages_BlankTextExcluded(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
@@ -312,8 +305,7 @@ func TestLoadMessages_BlankTextExcluded(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLoadStats_NoStepFinish(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
@@ -345,8 +337,7 @@ func TestLoadStats_NoStepFinish(t *testing.T) {
 }
 
 func TestLoadStats_WithTokens(t *testing.T) {
-	path, cleanup := createTestDB(t)
-	defer cleanup()
+	path := createTestDB(t)
 
 	db := openRW(t, path)
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
