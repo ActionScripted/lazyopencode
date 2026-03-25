@@ -19,7 +19,7 @@ func openReadOnlyDB(path string) (*sql.DB, bool, error) {
 		return nil, false, fmt.Errorf("open db: %w", err)
 	}
 	if err := db.Ping(); err != nil {
-		_ = db.Close()
+		_ = db.Close()        //nolint:errcheck // best-effort close on ping failure; original error takes priority
 		return nil, true, nil // missing file — treat as empty
 	}
 	return db, false, nil
@@ -36,10 +36,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 	if missing {
 		return []Session{}, nil
 	}
-	defer func() { _ = db.Close() }()
-
+	defer func() { _ = db.Close() }() //nolint:errcheck // deferred close; read-only connection
 	home, _ := os.UserHomeDir()
-
 	rows, err := db.Query(`
 		SELECT id, title, directory,
 		       time_created, time_updated,
@@ -53,7 +51,7 @@ func loadSessions(dbPath string) ([]Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query sessions: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer func() { _ = rows.Close() }() //nolint:errcheck // deferred close; rows already fully consumed
 
 	var sessions []Session
 	for rows.Next() {
@@ -89,7 +87,7 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	if missing {
 		return []Message{}, nil
 	}
-	defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close() }() //nolint:errcheck // deferred close; read-only connection
 
 	rows, err := db.Query(`
 		SELECT json_extract(m.data, '$.role'), json_extract(p.data, '$.text')
@@ -105,7 +103,7 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query messages: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer func() { _ = rows.Close() }() //nolint:errcheck // deferred close; rows already fully consumed
 
 	var messages []Message
 	for rows.Next() {
@@ -137,7 +135,7 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 	if missing {
 		return SessionStats{}, nil
 	}
-	defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close() }() //nolint:errcheck // deferred close; read-only connection
 
 	var stats SessionStats
 	var outputTokens, contextTokens *int // nullable — NULL when no step-finish parts

@@ -15,9 +15,7 @@ linters:
         # Disable pedantic doc-comment requirement on exported symbols
         - name: exported
           disabled: true
-    errcheck:
-      # Don't flag intentional blank-identifier discards: _ = foo()
-      check-blank: false
+    errcheck: {}
   exclusions:
     rules:
       # errcheck is noisy in test files
