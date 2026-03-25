@@ -300,7 +300,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errMsg:
 		m.err = msg.err
-		return m, m.loadSessionsCmd()
+		m.mode = ModeError
+		return m, nil
 
 	case tea.KeyMsg:
 		switch m.mode {
@@ -318,6 +319,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateYank(msg)
 		case ModeGoto:
 			return m.updateGoto(msg)
+		case ModeError:
+			return m.updateError(msg)
 		}
 	}
 	return m, nil

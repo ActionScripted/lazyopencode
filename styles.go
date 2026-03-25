@@ -98,6 +98,7 @@ var (
 	styleModeYank          = styleBadgeBase.Background(colorGreen)
 	styleModeConfirmDelete = styleBadgeBase.Background(colorDanger)
 	styleModeGoto          = styleBadgeBase.Background(colorYellow)
+	styleModeError         = styleBadgeBase.Background(colorDanger)
 
 	// Modal containers (confirm-delete / yank / goto overlays)
 	styleModal = lipgloss.NewStyle().

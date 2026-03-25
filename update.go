@@ -253,6 +253,16 @@ func (m model) updateGoto(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateError handles key events while ModeError is active.
+// Only q and ctrl+c are accepted — the app is in a hard error state
+// and requires a restart to recover.
+func (m model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 // d yanks the session's display directory; s yanks the session ID.
 // esc/q cancels back to normal mode.
 func (m model) updateYank(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

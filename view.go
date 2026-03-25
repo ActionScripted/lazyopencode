@@ -148,6 +148,10 @@ func (m model) View() string {
 
 	base := topBar + "\n" + body + "\n" + hint
 
+	if m.mode == ModeError {
+		return overlayModal(base, m.renderErrorModal(), w, h)
+	}
+
 	if m.mode == ModeConfirmDelete {
 		return overlayModal(base, m.renderSessionModal(), w, h)
 	}
@@ -173,11 +177,6 @@ func (m model) renderList(width, height int) string {
 	}
 	sb.WriteString(prefix + m.search.View() + "\n")
 	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width)) + "\n")
-
-	if m.err != nil {
-		sb.WriteString(styleDim.Render("  error: "+m.err.Error()) + "\n")
-		return sb.String()
-	}
 
 	if len(m.filtered) == 0 && len(m.sessions) == 0 {
 		sb.WriteString(styleDim.Render("  no sessions found") + "\n")
@@ -448,6 +447,8 @@ func (m model) renderHint(width int) string {
 		hints = "  d: directory   s: session id   esc: cancel"
 	case ModeGoto:
 		hints = "  s: shell   w: workspace   esc: cancel"
+	case ModeError:
+		hints = "  q: quit"
 	default:
 		hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
 	}
@@ -470,6 +471,8 @@ func (m model) renderHint(width int) string {
 		badge = styleModeYank.Render("YANK")
 	case ModeGoto:
 		badge = styleModeGoto.Render("GOTO")
+	case ModeError:
+		badge = styleModeError.Render("ERROR")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
 	}
@@ -707,6 +710,19 @@ func (m model) renderSessionModal() string {
 	content := styleModalTitle.Render("Delete session?") + "\n\n" +
 		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerWidth)) + "\n\n" +
 		confirm
+
+	return styleModal.Render(content)
+}
+
+// renderErrorModal returns the styled modal for a hard error state.
+// The app is non-interactive until the user quits.
+func (m model) renderErrorModal() string {
+	qKey := styleModalKey.Render("q")
+
+	msg := m.err.Error()
+	content := styleModalTitle.Render("Fatal Error") + "\n\n" +
+		styleDim.Render(truncate(msg, modalInnerWidth)) + "\n\n" +
+		qKey + "  quit"
 
 	return styleModal.Render(content)
 }
