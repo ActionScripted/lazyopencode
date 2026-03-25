@@ -38,6 +38,13 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+	case key.Matches(msg, m.keys.Back):
+		m.search.SetValue("")
+		m.filtered = filterSessions(m.sessions, "")
+		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
+		m, cmd := m.loadMessagesForCursor()
+		return m, cmd
+
 	case key.Matches(msg, m.keys.Search):
 		m.mode = ModeSearch
 		m.search.Focus()
@@ -110,7 +117,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Back) {
+	if key.Matches(msg, m.keys.Back) || key.Matches(msg, m.keys.Open) {
 		m.mode = ModeNormal
 		m.search.Blur()
 		return m, nil
