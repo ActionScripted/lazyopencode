@@ -238,3 +238,21 @@ func TestBaseName_HomeDir(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "~")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// ShortDirectory / DisplayDirectory
+// ---------------------------------------------------------------------------
+
+func TestShortDirectory(t *testing.T) {
+	s := Session{ShortDir: "myapp"}
+	if got := s.ShortDirectory(); got != "myapp" {
+		t.Errorf("got %q, want %q", got, "myapp")
+	}
+}
+
+func TestDisplayDirectory(t *testing.T) {
+	s := Session{DisplayDir: "~/projects/myapp"}
+	if got := s.DisplayDirectory(); got != "~/projects/myapp" {
+		t.Errorf("got %q, want %q", got, "~/projects/myapp")
+	}
+}

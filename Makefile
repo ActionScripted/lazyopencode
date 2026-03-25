@@ -2,7 +2,7 @@ BINARY  := build/lazyopencode
 LINK    := $(HOME)/.local/bin/lazyopencode
 SRC     := $(wildcard *.go)
 
-.PHONY: build link install clean fmt vet lint test check release
+.PHONY: build link install clean fmt vet lint test cover check release
 
 build: $(SRC)
 	@mkdir -p build
@@ -31,6 +31,10 @@ lint:
 
 test:
 	go test -race -count=1 ./...
+
+cover:
+	go test -race -count=1 -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
 
 check: fmt vet lint test
 
