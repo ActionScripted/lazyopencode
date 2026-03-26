@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -31,6 +32,12 @@ type statsLoadedMsg struct {
 // sessionDeletedMsg signals that a session was successfully deleted.
 type sessionDeletedMsg struct{}
 
+// sessionsDeleteErrMsg signals that one or more session deletions failed.
+// The app reloads from the DB to re-sync state after a partial failure.
+type sessionsDeleteErrMsg struct {
+	err error
+}
+
 // sessionOpenedMsg signals that an opencode session subprocess has exited.
 type sessionOpenedMsg struct{}
 
@@ -49,6 +56,15 @@ type dbErrMsg struct {
 // briefly in the hint bar without terminating the session.
 type opErrMsg struct {
 	err error
+}
+
+// resolveHome returns the current user's home directory, or "" on failure.
+// Used wherever a home dir string is needed for display (homeToTilde,
+// baseName, buildWorkspaces). Callers degrade gracefully to raw paths when
+// home is unavailable — acceptable since this is display-only.
+func resolveHome() string {
+	home, _ := os.UserHomeDir() // display-only; raw path is acceptable fallback
+	return home
 }
 
 type model struct {
@@ -176,8 +192,7 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	}
 	c := exec.Command(shell)
 	c.Dir = dir
-	home, _ := os.UserHomeDir()
-	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, home))
+	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, resolveHome()))
 	return tea.Sequence(tea.Println(notice), tea.ExecProcess(c, func(err error) tea.Msg {
 		if err != nil {
 			return opErrMsg{err: err}
@@ -187,7 +202,8 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 }
 
 // yankCmd copies text to the system clipboard using pbcopy (macOS) or
-// xclip (Linux). Fails silently — a missing clipboard tool is not fatal.
+// xclip (Linux). Non-fatal — a missing clipboard tool surfaces in the hint
+// bar via opErrMsg rather than crashing the app.
 func (m model) yankCmd(text string) tea.Cmd {
 	return func() tea.Msg {
 		var c *exec.Cmd
@@ -218,17 +234,22 @@ func (m model) deleteSessionCmd(sessionID string) tea.Cmd {
 }
 
 // deleteSessionsCmd deletes multiple sessions sequentially in a single
-// goroutine and returns one sessionDeletedMsg when all are done, avoiding
-// an N-reload storm on workspace delete.
+// goroutine. All deletions are attempted even if one fails — partial failures
+// are joined and returned as sessionsDeleteErrMsg so the caller can reload
+// from the DB to re-sync state. On full success it returns sessionDeletedMsg.
 func (m model) deleteSessionsCmd(ids []string) tea.Cmd {
 	if m.demoMode {
 		return nil
 	}
 	return func() tea.Msg {
+		var errs []error
 		for _, id := range ids {
 			if err := deleteOneSession(id); err != nil {
-				return opErrMsg{err: err}
+				errs = append(errs, err)
 			}
+		}
+		if len(errs) > 0 {
+			return sessionsDeleteErrMsg{err: errors.Join(errs...)}
 		}
 		return sessionDeletedMsg{}
 	}
@@ -264,8 +285,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
-		home, _ := os.UserHomeDir()
-		m.workspaces = buildWorkspaces(m.sessions, home)
+		m.workspaces = buildWorkspaces(m.sessions, resolveHome())
 		m.cursor = 0
 		m.workspaceCursor = 0
 		for i, ws := range m.workspaces {
@@ -302,6 +322,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionDeletedMsg:
 		// Optimistic removal already applied at confirm time; nothing to reload.
 		return m, nil
+
+	case sessionsDeleteErrMsg:
+		// One or more deletions failed. Surface the error and reload from the DB
+		// so the in-memory state re-syncs with reality.
+		m.notice = msg.err.Error()
+		return m, m.loadSessionsCmd()
 
 	case sessionOpenedMsg:
 		// Reload sessions to pick up any changes made during the opencode session.

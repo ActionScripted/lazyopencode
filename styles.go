@@ -21,6 +21,18 @@ var (
 	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
 	styleAccent = lipgloss.NewStyle().Foreground(colorCyan)
 
+	// Hint bar app name ("LazyOpenCode" logo) and decoration dots.
+	// These are declared here rather than inline in renderHint so that a theme
+	// change is a single-file edit.
+	styleAppNameLazy     = lipgloss.NewStyle().Foreground(colorBlue)
+	styleAppNameOpenCode = lipgloss.NewStyle().Foreground(colorBright).Bold(true)
+	styleDotBlue         = lipgloss.NewStyle().Foreground(colorBlue)
+	styleDotCyan         = lipgloss.NewStyle().Foreground(colorCyan)
+	styleDotYellow       = lipgloss.NewStyle().Foreground(colorYellow)
+
+	// Workspace session row title (right pane of workspaces view).
+	styleWorkspaceSessionTitle = lipgloss.NewStyle().Foreground(colorBright).Bold(true)
+
 	styleSearchPrefix = lipgloss.NewStyle().
 				Foreground(colorCyan).
 				Bold(true)

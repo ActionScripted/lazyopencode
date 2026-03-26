@@ -432,8 +432,8 @@ func renderTopBar(width int) string {
 
 func (m model) renderHint(width int) string {
 	appName := styleDim.Render(" ") +
-		lipgloss.NewStyle().Foreground(colorBlue).Render("Lazy") +
-		styleHintKey.Bold(true).Render("OpenCode")
+		styleAppNameLazy.Render("Lazy") +
+		styleAppNameOpenCode.Render("OpenCode")
 
 	var hints string
 	if m.notice != "" {
@@ -457,11 +457,11 @@ func (m model) renderHint(width int) string {
 		}
 	}
 	dots := "  " +
-		lipgloss.NewStyle().Foreground(colorBlue).Render("•") +
+		styleDotBlue.Render("•") +
 		" " +
-		lipgloss.NewStyle().Foreground(colorCyan).Render("•") +
+		styleDotCyan.Render("•") +
 		" " +
-		lipgloss.NewStyle().Foreground(colorYellow).Render("•")
+		styleDotYellow.Render("•")
 
 	var badge string
 	switch m.mode {
@@ -882,8 +882,9 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 		),
 	))
 
-	// header: path(1) + separator(1) = 2 lines
-	const headerLines = 2
+	// Compute header height dynamically so it never drifts out of sync with
+	// the header content (mirrors the approach used in renderPreview).
+	headerLines := strings.Count(header.String(), "\n") + 1
 	listHeight := height - headerLines
 	if listHeight < 1 {
 		listHeight = 1
@@ -917,8 +918,7 @@ func formatWorkspaceSessionRow(s Session, width int) string {
 	}
 
 	date := styleDim.Render(s.UpdatedAt.Format("2006-01-02 15:04"))
-	title := lipgloss.NewStyle().Foreground(colorBright).Bold(true).
-		Render(truncate(s.Title, titleW))
+	title := styleWorkspaceSessionTitle.Render(truncate(s.Title, titleW))
 
 	return date + strings.Repeat(" ", dateGap) + title
 }

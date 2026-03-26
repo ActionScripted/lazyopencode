@@ -12,15 +12,24 @@ import (
 // openReadOnlyDB opens the SQLite database at path in read-only mode and pings
 // it. Returns (db, false, nil) on success. Returns (nil, true, nil) when the
 // file does not exist (caller should treat this as empty state). Returns
-// (nil, false, err) for any other failure.
+// (nil, false, err) for any other failure (permissions, corrupt file, etc.).
 func openReadOnlyDB(path string) (*sql.DB, bool, error) {
+	// Distinguish "file not found" from other failures (permissions, corrupt
+	// header) before attempting to open so callers get a meaningful error
+	// instead of silently showing an empty session list.
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, true, nil // missing file — treat as empty
+	} else if err != nil {
+		return nil, false, fmt.Errorf("stat db: %w", err)
+	}
+
 	db, err := sql.Open("sqlite", path+"?mode=ro")
 	if err != nil {
 		return nil, false, fmt.Errorf("open db: %w", err)
 	}
 	if err := db.Ping(); err != nil {
-		_ = db.Close()        // best-effort close on ping failure; original error takes priority
-		return nil, true, nil // missing file — treat as empty
+		_ = db.Close() // best-effort close on ping failure; original error takes priority
+		return nil, false, fmt.Errorf("ping db: %w", err)
 	}
 	return db, false, nil
 }
@@ -37,7 +46,7 @@ func loadSessions(dbPath string) ([]Session, error) {
 		return []Session{}, nil
 	}
 	defer func() { _ = db.Close() }()
-	home, _ := os.UserHomeDir()
+	home := resolveHome()
 	rows, err := db.Query(`
 		SELECT id, title, directory,
 		       time_created, time_updated,
@@ -64,8 +73,8 @@ func loadSessions(dbPath string) ([]Session, error) {
 		); err != nil {
 			return nil, fmt.Errorf("scan session: %w", err)
 		}
-		s.CreatedAt = time.Unix(createdMS/1000, 0)
-		s.UpdatedAt = time.Unix(updatedMS/1000, 0)
+		s.CreatedAt = time.Unix(createdMS/1000, (createdMS%1000)*int64(time.Millisecond))
+		s.UpdatedAt = time.Unix(updatedMS/1000, (updatedMS%1000)*int64(time.Millisecond))
 		s.DisplayDir = homeToTilde(s.Directory, home)
 		s.ShortDir = baseName(s.Directory, home)
 		sessions = append(sessions, s)
@@ -92,13 +101,18 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	rows, err := db.Query(`
 		SELECT json_extract(m.data, '$.role'), json_extract(p.data, '$.text')
 		FROM message m
-		JOIN part p ON p.message_id = m.id
+		JOIN part p ON p.id = (
+		    SELECT p2.id
+		    FROM part p2
+		    WHERE p2.message_id = m.id
+		      AND json_extract(p2.data, '$.type') = 'text'
+		      AND json_extract(p2.data, '$.text') IS NOT NULL
+		      AND trim(json_extract(p2.data, '$.text')) != ''
+		    ORDER BY p2.rowid ASC
+		    LIMIT 1
+		)
 		WHERE m.session_id = ?
-		  AND json_extract(p.data, '$.type') = 'text'
-		  AND json_extract(p.data, '$.text') IS NOT NULL
-		  AND trim(json_extract(p.data, '$.text')) != ''
-		GROUP BY m.id
-		ORDER BY p.time_created
+		ORDER BY m.rowid ASC
 	`, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("query messages: %w", err)

@@ -15,12 +15,12 @@ link:
 install: build link
 
 clean:
-	rm -f $(BINARY) lazyopencode
+	rm -f $(BINARY)
 	rm -f $(LINK)
 
 fmt:
 	gofmt -w .
-	@which goimports > /dev/null && goimports -w . || echo "goimports not installed: go install golang.org/x/tools/cmd/goimports@latest"
+	@which goimports > /dev/null && goimports -w . || (echo "goimports not installed: go install golang.org/x/tools/cmd/goimports@latest"; exit 1)
 
 vet:
 	go vet ./...

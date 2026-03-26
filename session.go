@@ -79,9 +79,11 @@ func baseName(dir, home string) string {
 
 // filterSessions returns the subset of sessions matching query
 // against each session's FilterValue (title + directory).
+// Always returns an independent slice — callers may safely append to or modify
+// the result without aliasing m.sessions.
 func filterSessions(sessions []Session, query string) []Session {
 	if query == "" {
-		return sessions
+		return append([]Session(nil), sessions...)
 	}
 	q := strings.ToLower(query)
 	out := make([]Session, 0, len(sessions))

@@ -64,12 +64,12 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 
 ## Key conventions
 
-- All DB access is read-only (`?mode=ro`). A missing DB is treated as an empty state, not an error.
+- All DB access is read-only (`?mode=ro`). A missing DB file (ENOENT) is treated as empty state; any other open failure (permissions, corrupt file) surfaces as an error modal.
 - No CGO — the sqlite driver is `modernc.org/sqlite`.
 - All key bindings go through `key.Binding` in `KeyMap`. Never match keys with raw `msg.String() ==` comparisons.
-- `Session.DisplayDir`, `Session.ShortDir`, `Session.CreatedAt`, and `Session.Summary*` fields are pre-computed at load time. Do not call `os.UserHomeDir` in render paths.
+- `Session.DisplayDir`, `Session.ShortDir`, `Session.CreatedAt`, and `Session.Summary*` fields are pre-computed at load time. Do not call `os.UserHomeDir` in render paths. Use `resolveHome()` (defined in `model.go`) wherever a home directory string is needed outside the render path.
 - `SessionStats` (message count, output tokens, context window size) is loaded asynchronously via `loadStatsCmd` in parallel with `loadMessagesCmd` whenever the cursor moves. The model field `stats *SessionStats` is `nil` while loading.
-- `renderPreview` computes `headerLines` dynamically from the rendered header string — do not use a hardcoded constant.
+- `renderPreview` computes `headerLines` dynamically from the rendered header string — do not use a hardcoded constant. `renderWorkspaceSessions` follows the same pattern.
 - Update this file when adding new files, modes, or architectural patterns.
 
 ## Tooling
@@ -84,7 +84,7 @@ Run `make check` before committing — it runs `fmt`, `vet`, `lint`, and `test` 
 | `make test` | Runs `go test ./...` |
 | `make check` | Runs all of the above in order |
 
-Lint rules live in `.golangci.yml`. The active linters are `govet`, `staticcheck`, `errcheck`, `gosimple`, `unused`, `gofmt`, `goimports`, `misspell`, and `revive`. `revive` is configured without the exported-symbol doc-comment rule. To adjust linters or tweak rule severity, edit `.golangci.yml` only.
+Lint rules live in `.golangci.yml`. The active linters are `govet`, `staticcheck` (which subsumes `gosimple`), `errcheck`, `unused`, `gofmt`, `goimports`, `misspell`, and `revive`. `revive` is configured without the exported-symbol doc-comment rule. To adjust linters or tweak rule severity, edit `.golangci.yml` only.
 
 Install required dev tools:
 
