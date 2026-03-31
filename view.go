@@ -261,6 +261,44 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 	))
 	header.WriteString("\n")
 
+	// stats (async — show loading until statsLoadedMsg arrives)
+	if m.stats == nil {
+		header.WriteString(styleDim.Render("  loading stats…"))
+		header.WriteString("\n")
+	} else {
+		st := m.stats
+
+		// models
+		if len(st.Models) > 0 {
+			header.WriteString(metaLabel("model"))
+			header.WriteString(st.Models[0])
+			header.WriteString("\n")
+			for _, model := range st.Models[1:] {
+				header.WriteString(strings.Repeat(" ", labelW))
+				header.WriteString(model)
+				header.WriteString("\n")
+			}
+		}
+
+		// messages
+		header.WriteString(metaLabel("messages"))
+		fmt.Fprintf(&header, "%d", st.MsgCount)
+		header.WriteString("\n")
+
+		// context + tokens (only when AI turns exist)
+		if st.ContextTokens > 0 {
+			header.WriteString(metaLabel("context"))
+			header.WriteString(formatTokens(st.ContextTokens))
+			header.WriteString("\n")
+
+			header.WriteString(metaLabel("tokens"))
+			fmt.Fprintf(&header, "%s in / %s out", formatTokens(st.InputTokens), formatTokens(st.OutputTokens))
+			header.WriteString("\n")
+		}
+	}
+
+	header.WriteString("\n")
+
 	// created
 	header.WriteString(metaLabel("created"))
 	header.WriteString(s.CreatedAt.Format("2006-01-02 15:04"))
@@ -276,42 +314,20 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 	header.WriteString(formatDuration(s.UpdatedAt.Sub(s.CreatedAt)))
 	header.WriteString("\n")
 
-	// stats (async — show loading until statsLoadedMsg arrives)
-	if m.stats == nil {
-		header.WriteString(styleDim.Render("  loading stats…"))
-		header.WriteString("\n")
+	header.WriteString("\n")
+
+	// changes
+	header.WriteString(metaLabel("changes"))
+	if s.SummaryFiles > 0 {
+		fmt.Fprintf(&header, "%d files (", s.SummaryFiles)
+		header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
+		header.WriteString(" ")
+		header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
+		header.WriteString(")")
 	} else {
-		st := m.stats
-
-		// messages
-		header.WriteString(metaLabel("messages"))
-		fmt.Fprintf(&header, "%d", st.MsgCount)
-		header.WriteString("\n")
-
-		// context + output tokens (only when AI turns exist)
-		if st.ContextTokens > 0 {
-			header.WriteString(metaLabel("context"))
-			header.WriteString(formatTokens(st.ContextTokens))
-			header.WriteString("\n")
-
-			header.WriteString(metaLabel("output"))
-			header.WriteString(formatTokens(st.OutputTokens))
-			header.WriteString("\n")
-		}
-
-		// changes
-		header.WriteString(metaLabel("changes"))
-		if s.SummaryFiles > 0 {
-			fmt.Fprintf(&header, "%d files (", s.SummaryFiles)
-			header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
-			header.WriteString(" ")
-			header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
-			header.WriteString(")")
-		} else {
-			header.WriteString(styleDim.Render("none"))
-		}
-		header.WriteString("\n")
+		header.WriteString(styleDim.Render("none"))
 	}
+	header.WriteString("\n")
 
 	header.WriteString("\n")
 	header.WriteString(styleDim.Render(strings.Repeat("─", max(0, inner))))

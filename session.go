@@ -27,8 +27,10 @@ type Session struct {
 // part table. Loaded in parallel with messages whenever the cursor moves.
 type SessionStats struct {
 	MsgCount      int
-	OutputTokens  int // sum of tokens.output across all step-finish parts
-	ContextTokens int // tokens.total from the last step-finish part (0 if none)
+	InputTokens   int      // sum of tokens.input across all step-finish parts
+	OutputTokens  int      // sum of tokens.output across all step-finish parts
+	ContextTokens int      // tokens.total from the last step-finish part (0 if none)
+	Models        []string // distinct model IDs used in the session, ordered by first use
 }
 
 // Message represents a single chat message in a session.

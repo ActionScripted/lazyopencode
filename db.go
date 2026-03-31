@@ -152,11 +152,17 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 	defer func() { _ = db.Close() }()
 
 	var stats SessionStats
-	var outputTokens, contextTokens *int // nullable — NULL when no step-finish parts
+	var inputTokens, outputTokens, contextTokens *int // nullable — NULL when no step-finish parts
 
 	err = db.QueryRow(`
 		SELECT
 		    COUNT(DISTINCT m.id),
+		    (
+		        SELECT SUM(json_extract(p2.data, '$.tokens.input'))
+		        FROM part p2
+		        WHERE p2.session_id = ?
+		          AND json_extract(p2.data, '$.type') = 'step-finish'
+		    ),
 		    (
 		        SELECT SUM(json_extract(p2.data, '$.tokens.output'))
 		        FROM part p2
@@ -173,16 +179,51 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 		    )
 		FROM message m
 		WHERE m.session_id = ?
-	`, sessionID, sessionID, sessionID).Scan(&stats.MsgCount, &outputTokens, &contextTokens)
+	`, sessionID, sessionID, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens)
 	if err != nil {
 		return SessionStats{}, fmt.Errorf("query stats: %w", err)
 	}
 
+	if inputTokens != nil {
+		stats.InputTokens = *inputTokens
+	}
 	if outputTokens != nil {
 		stats.OutputTokens = *outputTokens
 	}
 	if contextTokens != nil {
 		stats.ContextTokens = *contextTokens
+	}
+
+	// Distinct models ordered by first use.
+	modelRows, err := db.Query(`
+		SELECT COALESCE(
+		           json_extract(data, '$.modelID'),
+		           json_extract(data, '$.model.modelID'),
+		           'unknown'
+		       )
+		FROM message
+		WHERE session_id = ?
+		  AND json_extract(data, '$.role') = 'assistant'
+		  AND (
+		      json_extract(data, '$.modelID') IS NOT NULL
+		      OR json_extract(data, '$.model.modelID') IS NOT NULL
+		  )
+		GROUP BY 1
+		ORDER BY MIN(rowid)
+	`, sessionID)
+	if err != nil {
+		return SessionStats{}, fmt.Errorf("query models: %w", err)
+	}
+	defer func() { _ = modelRows.Close() }()
+	for modelRows.Next() {
+		var name string
+		if err := modelRows.Scan(&name); err != nil {
+			return SessionStats{}, fmt.Errorf("scan model: %w", err)
+		}
+		stats.Models = append(stats.Models, name)
+	}
+	if err := modelRows.Err(); err != nil {
+		return SessionStats{}, fmt.Errorf("iterate models: %w", err)
 	}
 
 	return stats, nil

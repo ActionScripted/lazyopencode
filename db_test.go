@@ -346,11 +346,11 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert messages: %v", err)
 	}
-	// Two step-finish parts: output tokens 100 and 250; context tokens 1000 and 2000.
+	// Two step-finish parts: input 400+600, output 100+250; context tokens 1000 and 2000.
 	// The last one (time_created=2000) provides context_tokens=2000.
 	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
-		('p-1', 'msg-1', 'sess-1', '{"type":"step-finish","tokens":{"output":100,"total":1000}}', 1000),
-		('p-2', 'msg-2', 'sess-1', '{"type":"step-finish","tokens":{"output":250,"total":2000}}', 2000)`)
+		('p-1', 'msg-1', 'sess-1', '{"type":"step-finish","tokens":{"input":400,"output":100,"total":1000}}', 1000),
+		('p-2', 'msg-2', 'sess-1', '{"type":"step-finish","tokens":{"input":600,"output":250,"total":2000}}', 2000)`)
 	if err != nil {
 		t.Fatalf("insert parts: %v", err)
 	}
@@ -362,6 +362,9 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	}
 	if stats.MsgCount != 2 {
 		t.Errorf("MsgCount: got %d, want 2", stats.MsgCount)
+	}
+	if stats.InputTokens != 1000 {
+		t.Errorf("InputTokens: got %d, want 1000 (400+600)", stats.InputTokens)
 	}
 	if stats.OutputTokens != 350 {
 		t.Errorf("OutputTokens: got %d, want 350 (100+250)", stats.OutputTokens)

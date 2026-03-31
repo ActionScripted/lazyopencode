@@ -208,7 +208,7 @@ func TestLoadStatsCmd_ErrorReturnsZeroStats(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected statsLoadedMsg, got %T", msg)
 	}
-	if loaded.stats != (SessionStats{}) {
+	if loaded.stats.MsgCount != 0 || loaded.stats.InputTokens != 0 || loaded.stats.OutputTokens != 0 || loaded.stats.ContextTokens != 0 || len(loaded.stats.Models) != 0 {
 		t.Errorf("expected zero stats on error, got %+v", loaded.stats)
 	}
 }
