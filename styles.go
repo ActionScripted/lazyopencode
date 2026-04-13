@@ -4,19 +4,20 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Tokyo Night palette
-	colorFg       = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#a9b1d6"} // editor foreground
-	colorBright   = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"} // bright white / variable
-	colorDim      = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
-	colorCyan     = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
-	colorBlue     = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
-	colorOnBadge  = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
-	colorBgPanel  = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
-	colorSelected = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
-	colorBorder   = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
-	colorYellow   = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
-	colorGreen    = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
-	colorDanger   = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
-	colorPurple   = lipgloss.AdaptiveColor{Light: "#5a4a78", Dark: "#bb9af7"} // Tokyo Night purple
+	colorFg         = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#a9b1d6"} // editor foreground
+	colorBright     = lipgloss.AdaptiveColor{Light: "#343b58", Dark: "#c0caf5"} // bright white / variable
+	colorDim        = lipgloss.AdaptiveColor{Light: "#68608a", Dark: "#565f89"} // comments — muted text
+	colorCyan       = lipgloss.AdaptiveColor{Light: "#0f4b6e", Dark: "#7dcfff"} // cyan — preview pane
+	colorBlue       = lipgloss.AdaptiveColor{Light: "#3d59a1", Dark: "#7aa2f7"} // blue — list path + NORMAL badge
+	colorOnBadge    = lipgloss.AdaptiveColor{Light: "#ffffff", Dark: "#1a1b26"} // editor background — dark text on colored badges
+	colorBgPanel    = lipgloss.AdaptiveColor{Light: "#d5d6db", Dark: "#1e2030"} // opencode backgroundPanel — list areas, bottom bar
+	colorBgPanelAlt = lipgloss.AdaptiveColor{Light: "#c8c9cf", Dark: "#222436"} // slightly lighter stripe for stats table zebra rows
+	colorSelected   = lipgloss.AdaptiveColor{Light: "#b8cce4", Dark: "#283457"}
+	colorBorder     = lipgloss.AdaptiveColor{Light: "#a8aecb", Dark: "#3b4261"}
+	colorYellow     = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
+	colorGreen      = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
+	colorDanger     = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
+	colorPurple     = lipgloss.AdaptiveColor{Light: "#5a4a78", Dark: "#bb9af7"} // Tokyo Night purple
 
 	// Text
 	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
@@ -131,6 +132,12 @@ var (
 	styleStatsLabelPanel  = lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
 	styleStatsCountPanel  = lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Background(colorBgPanel)
 	styleStatsHeaderPanel = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
+
+	// Zebra-stripe alt-background variants for stats table data rows (odd rows).
+	styleSpPanelAlt         = lipgloss.NewStyle().Background(colorBgPanelAlt)
+	styleDimPanelAlt        = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanelAlt)
+	styleStatsLabelPanelAlt = lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanelAlt)
+	styleStatsCountPanelAlt = lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Background(colorBgPanelAlt)
 
 	// Modal containers (confirm-delete / yank / goto overlays)
 	styleModal = lipgloss.NewStyle().

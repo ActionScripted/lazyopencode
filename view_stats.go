@@ -337,17 +337,21 @@ func renderModelHeader(pad string, nameW int) string {
 func renderModelRows(rows []statsTableRow, pad string, nameW int) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
-	for _, r := range rows {
+	for i, r := range rows {
+		sp, label, count := styleSpPanel, styleStatsLabelPanel, styleStatsCountPanel
+		if i%2 != 0 {
+			sp, label, count = styleSpPanelAlt, styleStatsLabelPanelAlt, styleStatsCountPanelAlt
+		}
 		name := "   " + truncate(r.name, nameW-tblNameIndent)
 		sb.WriteString(pad)
-		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
-		sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-		sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
-		sb.WriteString(styleSpPanel.Render(" "))
+		sb.WriteString(label.Render(padRight(name, nameW)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
+		sb.WriteString(sp.Render(" "))
 		sb.WriteString("\n")
 	}
 	return sb.String()
@@ -419,7 +423,7 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
 	for _, r := range rows {
-		// Project row — name indented by tblNameIndent.
+		// Project row — standard background.
 		name := "   " + truncate(r.name, nameW-tblNameIndent)
 		sb.WriteString(pad)
 		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
@@ -432,18 +436,18 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int) string {
 		sb.WriteString(styleSpPanel.Render(" "))
 		sb.WriteString("\n")
 
-		// Per-model sub-rows: tblNameIndent + 2 extra spaces for the sub-indent.
+		// Per-model sub-rows: lighter alt background, tblNameIndent + 2 extra spaces for the sub-indent.
 		for _, sr := range r.subRows {
 			subName := "     " + truncate(sr.name, nameW-tblNameIndent-2)
 			sb.WriteString(pad)
-			sb.WriteString(styleDimPanel.Render(padRight(subName, nameW)))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*d", tblSessW, sr.sessions)))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*d", tblTurnW, sr.turns)))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(sr.inputTokens))))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(sr.outTokens))))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(sr.durationMS))))
-			sb.WriteString(styleDimPanel.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(sr.cost))))
-			sb.WriteString(styleSpPanel.Render(" "))
+			sb.WriteString(styleDimPanelAlt.Render(padRight(subName, nameW)))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessW, sr.sessions)))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnW, sr.turns)))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(sr.inputTokens))))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(sr.outTokens))))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(sr.durationMS))))
+			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(sr.cost))))
+			sb.WriteString(styleSpPanelAlt.Render(" "))
 			sb.WriteString("\n")
 		}
 	}
