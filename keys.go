@@ -17,6 +17,7 @@ const (
 	ModeConfirmDeleteWorkspace
 	ModeYank
 	ModeGoto
+	ModeStats
 	ModeError
 )
 
@@ -37,6 +38,8 @@ func (m Mode) String() string {
 		return "Yank"
 	case ModeGoto:
 		return "Goto"
+	case ModeStats:
+		return "Stats"
 	case ModeError:
 		return "Error"
 	default:
@@ -62,6 +65,7 @@ type KeyMap struct {
 	GotoPrefix    key.Binding
 	GotoShell     key.Binding
 	GotoWorkspace key.Binding
+	Stats         key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings.
@@ -130,6 +134,10 @@ func DefaultKeyMap() KeyMap {
 		GotoWorkspace: key.NewBinding(
 			key.WithKeys("w"),
 			key.WithHelp("w", "toggle workspace"),
+		),
+		Stats: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "stats"),
 		),
 	}
 }

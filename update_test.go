@@ -621,3 +621,96 @@ func TestUpdateYank_EmptyFilteredFallsBackToNormal(t *testing.T) {
 		t.Errorf("expected ModeNormal when filtered is empty, got %v", rm.mode)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// updateStats
+// ---------------------------------------------------------------------------
+
+func TestUpdateStats_EscReturnsNormalMode(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.mode = ModeStats
+
+	result, _ := m.updateStats(keyMsg("esc"))
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal, got %v", rm.mode)
+	}
+}
+
+func TestUpdateStats_QReturnsNormalMode(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.mode = ModeStats
+
+	result, _ := m.updateStats(keyMsg("q"))
+	rm := mustModel(t, result)
+	if rm.mode != ModeNormal {
+		t.Errorf("expected ModeNormal, got %v", rm.mode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// updateError
+// ---------------------------------------------------------------------------
+
+func TestUpdateError_QQuitsApp(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.mode = ModeError
+
+	_, cmd := m.updateError(keyMsg("q"))
+	if cmd == nil {
+		t.Error("expected a non-nil cmd (tea.Quit) when q is pressed in ModeError")
+	}
+}
+
+func TestUpdateError_OtherKeyNoOp(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.mode = ModeError
+
+	result, cmd := m.updateError(keyMsg("j"))
+	rm := mustModel(t, result)
+	if cmd != nil {
+		t.Error("expected nil cmd for non-quit key in ModeError")
+	}
+	if rm.mode != ModeError {
+		t.Errorf("mode should stay ModeError, got %v", rm.mode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// updateNormal — Stats key
+// ---------------------------------------------------------------------------
+
+func TestUpdateNormal_SEntersStatsMode(t *testing.T) {
+	m := modelWithSessions(makeSession("1", "A", "/a"))
+
+	result, _ := m.updateNormal(keyMsg("s"))
+	rm := mustModel(t, result)
+	if rm.mode != ModeStats {
+		t.Errorf("expected ModeStats, got %v", rm.mode)
+	}
+}
+
+func TestUpdateNormal_SWhenGlobalStatsNilReturnsCmd(t *testing.T) {
+	m := modelWithSessions(makeSession("1", "A", "/a"))
+	// m.globalStats is nil by default (zero value)
+
+	_, cmd := m.updateNormal(keyMsg("s"))
+	if cmd == nil {
+		t.Error("expected a non-nil cmd to load global stats when globalStats is nil")
+	}
+}
+
+func TestUpdateNormal_SWhenGlobalStatsCachedNoCmd(t *testing.T) {
+	m := modelWithSessions(makeSession("1", "A", "/a"))
+	gs := GlobalStats{}
+	m.globalStats = &gs
+
+	result, cmd := m.updateNormal(keyMsg("s"))
+	rm := mustModel(t, result)
+	if cmd != nil {
+		t.Error("expected nil cmd when globalStats is already cached")
+	}
+	if rm.mode != ModeStats {
+		t.Errorf("expected ModeStats, got %v", rm.mode)
+	}
+}

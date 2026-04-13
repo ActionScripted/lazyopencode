@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"path/filepath"
 	"time"
 )
@@ -9,7 +8,7 @@ import (
 // demoSessions returns a hardcoded set of fake sessions for --demo mode.
 // Nothing here touches the filesystem or the DB.
 func demoSessions() []Session {
-	home, _ := os.UserHomeDir()
+	home := resolveHome()
 
 	coolProject := filepath.Join(home, "cool-project")
 	anotherProject := filepath.Join(home, "another-project")
@@ -534,4 +533,76 @@ func demoStats(sessionID string) SessionStats {
 		return s
 	}
 	return SessionStats{}
+}
+
+// demoGlobalStats returns plausible GlobalStats for --demo mode.
+func demoGlobalStats() GlobalStats {
+	return GlobalStats{
+		TotalSessions:   25,
+		TotalMessages:   82,
+		TotalInput:      312400,
+		TotalOutput:     48210,
+		TotalCacheRead:  93720,
+		TotalCacheWrite: 62480,
+		TotalFiles:      234,
+		TotalAdditions:  12400,
+		TotalDeletions:  4200,
+		TotalDurationMS: 93_600_000, // 26h total (~1h 3m avg)
+
+		RecentSessions:   4,
+		RecentMessages:   14,
+		RecentInput:      38100,
+		RecentOutput:     6820,
+		RecentCacheRead:  11430,
+		RecentCacheWrite: 7620,
+		RecentFiles:      18,
+		RecentAdditions:  820,
+		RecentDeletions:  310,
+		RecentDurationMS: 10_800_000, // 3h total (45m avg)
+
+		Models: []ModelStat{
+			{Name: "claude-sonnet-4-6", Sessions: 18, Turns: 54, InputTokens: 241300, OutputTokens: 37200, DurationMS: 64_800_000},
+			{Name: "claude-opus-4-6", Sessions: 5, Turns: 12, InputTokens: 58400, OutputTokens: 8900, DurationMS: 21_600_000},
+			{Name: "claude-haiku-4-5-20251001", Sessions: 2, Turns: 4, InputTokens: 12700, OutputTokens: 2110, DurationMS: 7_200_000},
+		},
+
+		RecentModels: []ModelStat{
+			{Name: "claude-sonnet-4-6", Sessions: 3, Turns: 10, InputTokens: 29400, OutputTokens: 5200, DurationMS: 7_200_000},
+			{Name: "claude-opus-4-6", Sessions: 1, Turns: 4, InputTokens: 8700, OutputTokens: 1620, DurationMS: 3_600_000},
+		},
+
+		Projects: []ProjectStat{
+			{
+				Dir: "/Users/demo/code/myapp", DisplayDir: "~/code/myapp",
+				Sessions: 9, Turns: 28, InputTokens: 142300, OutputTokens: 21400, DurationMS: 36_000_000,
+				Models: []ModelStat{
+					{Name: "claude-sonnet-4-6", Sessions: 6, Turns: 18, InputTokens: 98100, OutputTokens: 14800, DurationMS: 21_600_000},
+					{Name: "claude-opus-4-6", Sessions: 3, Turns: 8, InputTokens: 44200, OutputTokens: 6600, DurationMS: 14_400_000},
+				},
+			},
+			{
+				Dir: "/Users/demo/code/lazyopencode", DisplayDir: "~/code/lazyopencode",
+				Sessions: 7, Turns: 20, InputTokens: 98200, OutputTokens: 14700, DurationMS: 25_200_000,
+				Models: []ModelStat{
+					{Name: "claude-sonnet-4-6", Sessions: 5, Turns: 14, InputTokens: 71400, OutputTokens: 10900, DurationMS: 18_000_000},
+					{Name: "claude-haiku-4-5-20251001", Sessions: 2, Turns: 4, InputTokens: 26800, OutputTokens: 3800, DurationMS: 7_200_000},
+				},
+			},
+			{
+				Dir: "/Users/demo/code/api", DisplayDir: "~/code/api",
+				Sessions: 5, Turns: 14, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000,
+				Models: []ModelStat{
+					{Name: "claude-sonnet-4-6", Sessions: 5, Turns: 12, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000},
+				},
+			},
+			{
+				Dir: "/Users/demo/code/infra", DisplayDir: "~/code/infra",
+				Sessions: 4, Turns: 10, InputTokens: 23800, OutputTokens: 4810, DurationMS: 14_400_000,
+				Models: []ModelStat{
+					{Name: "claude-opus-4-6", Sessions: 2, Turns: 4, InputTokens: 14200, OutputTokens: 2900, DurationMS: 7_200_000},
+					{Name: "claude-sonnet-4-6", Sessions: 2, Turns: 6, InputTokens: 9600, OutputTokens: 1910, DurationMS: 7_200_000},
+				},
+			},
+		},
+	}
 }

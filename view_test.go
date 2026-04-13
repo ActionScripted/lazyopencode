@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -15,16 +16,16 @@ func TestFormatDuration(t *testing.T) {
 		d    time.Duration
 		want string
 	}{
-		{0, "< 1m"},
-		{30 * time.Second, "< 1m"},
-		{59*time.Second + 999*time.Millisecond, "< 1m"},
+		{0, "0s"},
+		{30 * time.Second, "30s"},
+		{59*time.Second + 999*time.Millisecond, "59s"},
 		{time.Minute, "1m"},
 		{90 * time.Second, "1m"},
 		{45 * time.Minute, "45m"},
-		{time.Hour, "1h 0m"},
+		{time.Hour, "1h"},
 		{time.Hour + 30*time.Minute, "1h 30m"},
 		{2*time.Hour + 5*time.Minute, "2h 5m"},
-		{-time.Minute, "< 1m"}, // negative clamped to 0
+		{-time.Minute, "0s"}, // negative clamped to 0
 	}
 	for _, tc := range tests {
 		got := formatDuration(tc.d)
@@ -289,5 +290,105 @@ func TestFormatSessionRow_TitleMinWidth(t *testing.T) {
 	got := formatSessionRow(s, 1, 0, false)
 	if got == "" {
 		t.Error("expected non-empty row even at width=1")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// fmtCommas
+// ---------------------------------------------------------------------------
+
+func TestFmtCommas(t *testing.T) {
+	tests := []struct {
+		n    int
+		want string
+	}{
+		{0, "0"},
+		{999, "999"},
+		{1000, "1,000"},
+		{12400, "12,400"},
+		{1000000, "1,000,000"},
+		{1234567, "1,234,567"},
+	}
+	for _, tc := range tests {
+		got := fmtCommas(tc.n)
+		if got != tc.want {
+			t.Errorf("fmtCommas(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// formatDurationMS
+// ---------------------------------------------------------------------------
+
+func TestFormatDurationMS(t *testing.T) {
+	tests := []struct {
+		ms   int64
+		want string
+	}{
+		{0, "0s"},
+		{30000, "30s"},      // 30 seconds
+		{90000, "1m"},       // 90 seconds
+		{3600000, "1h"},     // 1 hour
+		{5400000, "1h 30m"}, // 1.5 hours
+	}
+	for _, tc := range tests {
+		got := formatDurationMS(tc.ms)
+		if got != tc.want {
+			t.Errorf("formatDurationMS(%d) = %q, want %q", tc.ms, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// modelCost
+// ---------------------------------------------------------------------------
+
+func TestModelCost(t *testing.T) {
+	tests := []struct {
+		name         string
+		model        string
+		inputTokens  int
+		outputTokens int
+		want         float64
+	}{
+		{"sonnet-4 input price", "claude-sonnet-4-6", 1_000_000, 0, 3.0},
+		{"opus-4 output price", "claude-opus-4-6", 0, 1_000_000, 75.0},
+		{"unknown model returns zero", "gpt-4o", 1_000_000, 1_000_000, 0},
+		{"zero tokens returns zero", "claude-sonnet-4-6", 0, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := modelCost(tc.model, tc.inputTokens, tc.outputTokens)
+			if math.Abs(got-tc.want) >= 0.001 {
+				t.Errorf("modelCost(%q, %d, %d) = %f, want %f",
+					tc.model, tc.inputTokens, tc.outputTokens, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// fmtCost
+// ---------------------------------------------------------------------------
+
+func TestFmtCost(t *testing.T) {
+	tests := []struct {
+		f    float64
+		want string
+	}{
+		{0, "—"},
+		{-1.0, "—"},
+		{0.001, "<$0.01"},
+		{0.42, "$0.42"},
+		{3.5, "$3.50"},
+		{42.1, "$42"},
+		{1500.0, "$1.5K"},
+	}
+	for _, tc := range tests {
+		got := fmtCost(tc.f)
+		if got != tc.want {
+			t.Errorf("fmtCost(%v) = %q, want %q", tc.f, got, tc.want)
+		}
 	}
 }

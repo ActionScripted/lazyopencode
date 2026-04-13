@@ -126,7 +126,7 @@ func TestOpenReadOnlyDB_ValidFile(t *testing.T) {
 func TestLoadSessions_Empty(t *testing.T) {
 	path := createTestDB(t)
 
-	sessions, err := loadSessions(path)
+	sessions, err := loadSessions(path, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestLoadSessions_Empty(t *testing.T) {
 }
 
 func TestLoadSessions_MissingDB(t *testing.T) {
-	sessions, err := loadSessions("/nonexistent/opencode.db")
+	sessions, err := loadSessions("/nonexistent/opencode.db", "")
 	if err != nil {
 		t.Fatalf("missing DB should not return an error, got: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestLoadSessions_Populated(t *testing.T) {
 	insertSession(t, db, "sess-1", "My Session", dir, createdMS, updatedMS, nil)
 	_ = db.Close()
 
-	sessions, err := loadSessions(path)
+	sessions, err := loadSessions(path, home)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestLoadSessions_ChildSessionsExcluded(t *testing.T) {
 	insertSession(t, db, "child-1", "Child", "/tmp/a", 1000, 2000, &parentID)
 	_ = db.Close()
 
-	sessions, err := loadSessions(path)
+	sessions, err := loadSessions(path, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -371,5 +371,206 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	}
 	if stats.ContextTokens != 2000 {
 		t.Errorf("ContextTokens: got %d, want 2000 (last step-finish)", stats.ContextTokens)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestOpenReadOnlyDB_CorruptFile
+// ---------------------------------------------------------------------------
+
+func TestOpenReadOnlyDB_CorruptFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "corrupt.db")
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	if _, err := f.WriteString("this is not a sqlite database"); err != nil {
+		_ = f.Close()
+		t.Fatalf("write corrupt content: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("close temp file: %v", err)
+	}
+
+	db, missing, err := openReadOnlyDB(path)
+	if err == nil {
+		t.Fatal("expected an error for a corrupt file, got nil")
+	}
+	if missing {
+		t.Errorf("expected missing=false for a corrupt file that exists, got true")
+	}
+	if db != nil {
+		_ = db.Close()
+		t.Errorf("expected nil db for a corrupt file, got non-nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestLoadSessions_SubSecondPrecision
+// ---------------------------------------------------------------------------
+
+func TestLoadSessions_SubSecondPrecision(t *testing.T) {
+	path := createTestDB(t)
+	createdMS := int64(1705320000500) // 500 ms sub-second component
+
+	db := openRW(t, path)
+	insertSession(t, db, "sess-1", "Sub-second", "/tmp/sub", createdMS, createdMS+1000, nil)
+	_ = db.Close()
+
+	sessions, err := loadSessions(path, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+
+	got := sessions[0].CreatedAt.UnixMilli()
+	if got != createdMS {
+		t.Errorf("CreatedAt.UnixMilli(): got %d, want %d", got, createdMS)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestLoadMessages_MultiplePartsPicksFirst
+// ---------------------------------------------------------------------------
+
+func TestLoadMessages_MultiplePartsPicksFirst(t *testing.T) {
+	path := createTestDB(t)
+
+	db := openRW(t, path)
+	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
+		('msg-1', 'sess-1', '{"role":"user"}')`)
+	if err != nil {
+		t.Fatalf("insert message: %v", err)
+	}
+	// p-1: blank (must be skipped), p-2: first valid (must be picked), p-3: second valid (ignored).
+	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
+		('p-1', 'msg-1', 'sess-1', '{"type":"text","text":"   "}', 1000),
+		('p-2', 'msg-1', 'sess-1', '{"type":"text","text":"first valid"}', 2000),
+		('p-3', 'msg-1', 'sess-1', '{"type":"text","text":"second valid"}', 3000)`)
+	if err != nil {
+		t.Fatalf("insert parts: %v", err)
+	}
+	_ = db.Close()
+
+	messages, err := loadMessages(path, "sess-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+	if messages[0].Text != "first valid" {
+		t.Errorf("Text: got %q, want %q", messages[0].Text, "first valid")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestLoadStats_InputTokensZeroWhenNoStepFinish
+// ---------------------------------------------------------------------------
+
+func TestLoadStats_InputTokensZeroWhenNoStepFinish(t *testing.T) {
+	path := createTestDB(t)
+
+	db := openRW(t, path)
+	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
+		('msg-1', 'sess-1', '{"role":"user"}')`)
+	if err != nil {
+		t.Fatalf("insert message: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
+		('p-1', 'msg-1', 'sess-1', '{"type":"text","text":"hello"}', 1000)`)
+	if err != nil {
+		t.Fatalf("insert part: %v", err)
+	}
+	_ = db.Close()
+
+	stats, err := loadStats(path, "sess-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stats.InputTokens != 0 {
+		t.Errorf("InputTokens: got %d, want 0 (no step-finish parts)", stats.InputTokens)
+	}
+	if stats.OutputTokens != 0 {
+		t.Errorf("OutputTokens: got %d, want 0", stats.OutputTokens)
+	}
+	if stats.ContextTokens != 0 {
+		t.Errorf("ContextTokens: got %d, want 0", stats.ContextTokens)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestLoadStats_ContextTokensFromLatestStepFinish
+// ---------------------------------------------------------------------------
+
+func TestLoadStats_ContextTokensFromLatestStepFinish(t *testing.T) {
+	path := createTestDB(t)
+
+	db := openRW(t, path)
+	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
+		('msg-1', 'sess-1', '{"role":"assistant"}'),
+		('msg-2', 'sess-1', '{"role":"assistant"}')`)
+	if err != nil {
+		t.Fatalf("insert messages: %v", err)
+	}
+	// Part 1: time_created=1000, total=1000; Part 2: time_created=2000, total=9999.
+	// ContextTokens must come from the later one (9999).
+	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
+		('p-1', 'msg-1', 'sess-1', '{"type":"step-finish","tokens":{"input":100,"output":50,"total":1000}}', 1000),
+		('p-2', 'msg-2', 'sess-1', '{"type":"step-finish","tokens":{"input":200,"output":75,"total":9999}}', 2000)`)
+	if err != nil {
+		t.Fatalf("insert parts: %v", err)
+	}
+	_ = db.Close()
+
+	stats, err := loadStats(path, "sess-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stats.ContextTokens != 9999 {
+		t.Errorf("ContextTokens: got %d, want 9999 (latest step-finish)", stats.ContextTokens)
+	}
+	if stats.InputTokens != 300 {
+		t.Errorf("InputTokens: got %d, want 300 (100+200)", stats.InputTokens)
+	}
+	if stats.OutputTokens != 125 {
+		t.Errorf("OutputTokens: got %d, want 125 (50+75)", stats.OutputTokens)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TestLoadStats_Models
+// ---------------------------------------------------------------------------
+
+func TestLoadStats_Models(t *testing.T) {
+	path := createTestDB(t)
+
+	db := openRW(t, path)
+	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
+		('msg-1', 'sess-1', '{"role":"assistant","modelID":"claude-sonnet-4-6"}'),
+		('msg-2', 'sess-1', '{"role":"assistant","modelID":"claude-opus-4-6"}'),
+		('msg-3', 'sess-1', '{"role":"assistant","modelID":"claude-sonnet-4-6"}'),
+		('msg-4', 'sess-1', '{"role":"user"}')`)
+	if err != nil {
+		t.Fatalf("insert messages: %v", err)
+	}
+	_ = db.Close()
+
+	stats, err := loadStats(path, "sess-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stats.Models) != 2 {
+		t.Fatalf("Models: got %d, want 2", len(stats.Models))
+	}
+	if stats.Models[0] != "claude-sonnet-4-6" {
+		t.Errorf("Models[0]: got %q, want %q", stats.Models[0], "claude-sonnet-4-6")
+	}
+	if stats.Models[1] != "claude-opus-4-6" {
+		t.Errorf("Models[1]: got %q, want %q", stats.Models[1], "claude-opus-4-6")
 	}
 }

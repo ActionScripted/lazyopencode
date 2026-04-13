@@ -33,6 +33,58 @@ type SessionStats struct {
 	Models        []string // distinct model IDs used in the session, ordered by first use
 }
 
+// ModelStat holds aggregate usage for a single AI model.
+type ModelStat struct {
+	Name         string
+	Sessions     int
+	Turns        int // count of step-finish parts attributed to this model
+	InputTokens  int
+	OutputTokens int
+	DurationMS   int64 // sum of (time_updated - time_created) for sessions using this model
+}
+
+// ProjectStat holds aggregate stats for a project directory.
+type ProjectStat struct {
+	Dir          string
+	DisplayDir   string
+	Sessions     int
+	Turns        int // count of step-finish parts across all sessions in this project
+	InputTokens  int
+	OutputTokens int
+	DurationMS   int64
+	Models       []ModelStat // per-model breakdown within this project, ordered by session count desc
+}
+
+// GlobalStats holds aggregate stats across all sessions, used by the stats dashboard.
+type GlobalStats struct {
+	// All-time totals
+	TotalSessions   int
+	TotalMessages   int
+	TotalInput      int
+	TotalOutput     int
+	TotalCacheRead  int
+	TotalCacheWrite int
+	TotalFiles      int
+	TotalAdditions  int
+	TotalDeletions  int
+	TotalDurationMS int64 // sum of (time_updated - time_created) across all sessions
+	// Last-7-days totals
+	RecentSessions   int
+	RecentMessages   int
+	RecentInput      int
+	RecentOutput     int
+	RecentCacheRead  int
+	RecentCacheWrite int
+	RecentFiles      int
+	RecentAdditions  int
+	RecentDeletions  int
+	RecentDurationMS int64
+	// Breakdowns
+	Models       []ModelStat   // all-time, ordered by session count desc
+	RecentModels []ModelStat   // last 7 days, ordered by session count desc
+	Projects     []ProjectStat // top 10, ordered by session count desc
+}
+
 // Message represents a single chat message in a session.
 type Message struct {
 	Role string // "user" or "assistant"

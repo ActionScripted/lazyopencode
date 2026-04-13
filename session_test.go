@@ -219,3 +219,54 @@ func TestBaseName_HomeDir(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "~")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// filterSessions — slice independence
+// ---------------------------------------------------------------------------
+
+func TestFilterSessions_EmptyQueryReturnsIndependentSlice(t *testing.T) {
+	original := []Session{
+		makeSession("1", "A", "/a"),
+		makeSession("2", "B", "/b"),
+	}
+	got := filterSessions(original, "")
+	// Append to the result — must not affect the original slice.
+	got = append(got, makeSession("3", "C", "/c"))
+	if len(original) != 2 {
+		t.Errorf("original slice was aliased: len = %d, want 2", len(original))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// homeToTilde — edge cases
+// ---------------------------------------------------------------------------
+
+func TestHomeToTilde_EmptyHome(t *testing.T) {
+	// strings.Replace(s, "", "~", 1) inserts "~" before the first character.
+	// This test pins that boundary behaviour: an empty home string causes the
+	// tilde to be prepended to any path.
+	got := homeToTilde("/some/path", "")
+	want := "~/some/path"
+	if got != want {
+		t.Errorf("homeToTilde(%q, %q) = %q, want %q", "/some/path", "", got, want)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// baseName — edge cases
+// ---------------------------------------------------------------------------
+
+func TestBaseName_EmptyHome(t *testing.T) {
+	// When both dir and home are empty they are equal, so "~" is returned.
+	got := baseName("", "")
+	if got != "~" {
+		t.Errorf(`baseName("", "") = %q, want "~"`, got)
+	}
+
+	// When home is empty but dir is not, filepath.Base of the last component
+	// is returned.
+	got2 := baseName("/some/path", "")
+	if got2 != "path" {
+		t.Errorf(`baseName("/some/path", "") = %q, want "path"`, got2)
+	}
+}

@@ -82,8 +82,26 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingDeleteID = m.filtered[m.cursor].ID
 		m.mode = ModeConfirmDelete
 		return m, nil
+
+	case key.Matches(msg, m.keys.Stats):
+		m.mode = ModeStats
+		if m.globalStats == nil {
+			return m, m.loadGlobalStatsCmd()
+		}
+		return m, nil
 	}
 
+	return m, nil
+}
+
+// updateStats handles key events while ModeStats is active.
+// esc/q returns to ModeNormal.
+func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
+		m.mode = ModeNormal
+		return m, nil
+	}
 	return m, nil
 }
 
@@ -169,7 +187,7 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.sessions = removeSessionByID(m.sessions, id)
 			m.filtered = removeSessionByID(m.filtered, id)
 		}
-		m.workspaces = buildWorkspaces(m.sessions, resolveHome())
+		m.workspaces = buildWorkspaces(m.sessions, m.home)
 		m.workspaceCursor = clamp(m.workspaceCursor, 0, max(0, len(m.workspaces)-1))
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
@@ -199,7 +217,7 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Optimistic removal.
 		m.sessions = removeSessionByID(m.sessions, id)
 		m.filtered = removeSessionByID(m.filtered, id)
-		m.workspaces = buildWorkspaces(m.sessions, resolveHome())
+		m.workspaces = buildWorkspaces(m.sessions, m.home)
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
 		var cmd tea.Cmd

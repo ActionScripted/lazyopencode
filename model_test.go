@@ -5,6 +5,8 @@ import (
 	"os"
 	"slices"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ---------------------------------------------------------------------------
@@ -314,4 +316,209 @@ func createCorruptDB(t *testing.T, path string) error {
 	defer f.Close()
 	_, err = f.WriteString("this is not a sqlite database")
 	return err
+}
+
+// ---------------------------------------------------------------------------
+// Update message routing
+// ---------------------------------------------------------------------------
+
+func TestUpdate_SessionsLoadedMsg(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+
+	sessions := []Session{
+		makeSession("s1", "Session One", "/tmp/dir-a"),
+		makeSession("s2", "Session Two", "/tmp/dir-b"),
+	}
+	msg := sessionsLoadedMsg{sessions: sessions}
+
+	result, _ := m.Update(msg)
+	rm := mustModel(t, result)
+
+	if len(rm.sessions) != 2 {
+		t.Errorf("sessions: got %d, want 2", len(rm.sessions))
+	}
+	if len(rm.filtered) != 2 {
+		t.Errorf("filtered: got %d, want 2", len(rm.filtered))
+	}
+	if len(rm.workspaces) != 2 {
+		t.Errorf("workspaces: got %d, want 2 (one per dir)", len(rm.workspaces))
+	}
+	if rm.cursor != 0 {
+		t.Errorf("cursor: got %d, want 0", rm.cursor)
+	}
+}
+
+func TestUpdate_DbErrMsg(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+
+	result, _ := m.Update(dbErrMsg{err: errors.New("db is toast")})
+	rm := mustModel(t, result)
+
+	if rm.mode != ModeError {
+		t.Errorf("mode: got %v, want ModeError", rm.mode)
+	}
+	if rm.err == nil {
+		t.Fatal("expected err to be set, got nil")
+	}
+	if rm.err.Error() != "db is toast" {
+		t.Errorf("err.Error(): got %q, want %q", rm.err.Error(), "db is toast")
+	}
+}
+
+func TestUpdate_OpErrMsg(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+
+	result, _ := m.Update(opErrMsg{err: errors.New("clipboard failed")})
+	rm := mustModel(t, result)
+
+	if rm.notice != "clipboard failed" {
+		t.Errorf("notice: got %q, want %q", rm.notice, "clipboard failed")
+	}
+	if rm.mode != ModeNormal {
+		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
+	}
+}
+
+func TestUpdate_KeyMsgClearsNotice(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.notice = "some error"
+
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	rm := mustModel(t, result)
+
+	if rm.notice != "" {
+		t.Errorf("notice: got %q, want empty string", rm.notice)
+	}
+}
+
+func TestUpdate_SessionsDeleteErrMsg(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+
+	result, cmd := m.Update(sessionsDeleteErrMsg{err: errors.New("delete failed")})
+	rm := mustModel(t, result)
+
+	if rm.notice != "delete failed" {
+		t.Errorf("notice: got %q, want %q", rm.notice, "delete failed")
+	}
+	if cmd == nil {
+		t.Error("expected a non-nil reload cmd, got nil")
+	}
+}
+
+func TestUpdate_StatsLoadedMsg_Accepted(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.cursor = 0
+	m.previewSessionID = "sess-1"
+
+	result, _ := m.Update(statsLoadedMsg{sessionID: "sess-1", stats: SessionStats{MsgCount: 42}})
+	rm := mustModel(t, result)
+
+	if rm.stats == nil {
+		t.Fatal("expected stats to be set, got nil")
+	}
+	if rm.stats.MsgCount != 42 {
+		t.Errorf("stats.MsgCount: got %d, want 42", rm.stats.MsgCount)
+	}
+}
+
+func TestUpdate_StatsLoadedMsg_Stale(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.cursor = 0
+	m.previewSessionID = "sess-1"
+
+	result, _ := m.Update(statsLoadedMsg{sessionID: "stale-id", stats: SessionStats{MsgCount: 99}})
+	rm := mustModel(t, result)
+
+	if rm.stats != nil {
+		t.Errorf("expected stats to be nil (stale load discarded), got %+v", rm.stats)
+	}
+}
+
+func TestUpdate_MessagesLoadedMsg_Accepted(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.cursor = 0
+
+	result, _ := m.Update(messagesLoadedMsg{
+		sessionID: "sess-1",
+		messages:  []Message{{Role: "user", Text: "hello"}},
+	})
+	rm := mustModel(t, result)
+
+	if len(rm.messages) != 1 {
+		t.Fatalf("messages: got %d, want 1", len(rm.messages))
+	}
+	if rm.messages[0].Text != "hello" {
+		t.Errorf("messages[0].Text: got %q, want %q", rm.messages[0].Text, "hello")
+	}
+}
+
+func TestUpdate_MessagesLoadedMsg_Stale(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.cursor = 0
+
+	result, _ := m.Update(messagesLoadedMsg{
+		sessionID: "wrong-id",
+		messages:  []Message{{Role: "user", Text: "hello"}},
+	})
+	rm := mustModel(t, result)
+
+	if rm.messages != nil {
+		t.Errorf("expected messages to be nil (stale load discarded), got %v", rm.messages)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// deleteSessionsCmd partial failure
+// ---------------------------------------------------------------------------
+
+func TestDeleteSessionsCmd_PartialFailure(t *testing.T) {
+	original := runCommand
+	defer func() { runCommand = original }()
+
+	runCommand = func(name string, args ...string) error {
+		if args[2] == "s2" {
+			return errors.New("opencode: session s2 not found")
+		}
+		return nil
+	}
+
+	m := newModel("/tmp/fake.db", false)
+	msg := m.deleteSessionsCmd([]string{"s1", "s2", "s3"})()
+
+	errMsg, ok := msg.(sessionsDeleteErrMsg)
+	if !ok {
+		t.Fatalf("expected sessionsDeleteErrMsg, got %T", msg)
+	}
+	if errMsg.err == nil {
+		t.Error("expected err to be non-nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// loadGlobalStatsCmd
+// ---------------------------------------------------------------------------
+
+func TestLoadGlobalStatsCmd_DemoMode(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	cmd := m.loadGlobalStatsCmd()
+	msg := cmd()
+
+	if _, ok := msg.(globalStatsLoadedMsg); !ok {
+		t.Fatalf("expected globalStatsLoadedMsg, got %T", msg)
+	}
+}
+
+func TestLoadGlobalStatsCmd_WithDB(t *testing.T) {
+	path := createTestDB(t)
+	m := newModel(path, false)
+	cmd := m.loadGlobalStatsCmd()
+	msg := cmd()
+
+	if _, ok := msg.(globalStatsLoadedMsg); !ok {
+		t.Fatalf("expected globalStatsLoadedMsg, got %T", msg)
+	}
 }

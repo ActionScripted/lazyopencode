@@ -58,6 +58,11 @@ type opErrMsg struct {
 	err error
 }
 
+// globalStatsLoadedMsg carries aggregate stats for the stats dashboard.
+type globalStatsLoadedMsg struct {
+	stats GlobalStats
+}
+
 // resolveHome returns the current user's home directory, or "" on failure.
 // Used wherever a home dir string is needed for display (homeToTilde,
 // baseName, buildWorkspaces). Callers degrade gracefully to raw paths when
@@ -77,6 +82,7 @@ type model struct {
 	width                  int
 	height                 int
 	dbPath                 string
+	home                   string // user home directory, resolved once at startup
 	demoMode               bool
 	err                    error
 	notice                 string        // transient operation error; cleared on next keypress
@@ -87,6 +93,7 @@ type model struct {
 	workspaceCursor        int           // cursor into workspaces slice
 	pendingDeleteID        string        // session ID awaiting delete confirmation
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
+	globalStats            *GlobalStats  // cached aggregate stats; nil until first load
 }
 
 func newModel(dbPath string, demoMode bool) model {
@@ -98,6 +105,7 @@ func newModel(dbPath string, demoMode bool) model {
 		mode:     ModeNormal,
 		keys:     DefaultKeyMap(),
 		dbPath:   dbPath,
+		home:     resolveHome(),
 		demoMode: demoMode,
 		search:   ti,
 	}
@@ -112,7 +120,7 @@ func (m model) loadSessionsCmd() tea.Cmd {
 		return func() tea.Msg { return sessionsLoadedMsg{sessions: demoSessions()} }
 	}
 	return func() tea.Msg {
-		sessions, err := loadSessions(m.dbPath)
+		sessions, err := loadSessions(m.dbPath, m.home)
 		if err != nil {
 			return dbErrMsg{err: err}
 		}
@@ -149,6 +157,19 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 			return statsLoadedMsg{sessionID: sessionID, stats: SessionStats{}}
 		}
 		return statsLoadedMsg{sessionID: sessionID, stats: stats}
+	}
+}
+
+func (m model) loadGlobalStatsCmd() tea.Cmd {
+	if m.demoMode {
+		return func() tea.Msg { return globalStatsLoadedMsg{stats: demoGlobalStats()} }
+	}
+	return func() tea.Msg {
+		stats, err := loadGlobalStats(m.dbPath, m.home)
+		if err != nil {
+			return globalStatsLoadedMsg{} // zero value on error — dashboard shows zeros
+		}
+		return globalStatsLoadedMsg{stats: stats}
 	}
 }
 
@@ -192,7 +213,7 @@ func (m model) openShellCmd(dir string) tea.Cmd {
 	}
 	c := exec.Command(shell)
 	c.Dir = dir
-	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, resolveHome()))
+	notice := fmt.Sprintf("\nopening shell in %s — type 'exit' to return to lazyopencode\n", homeToTilde(dir, m.home))
 	return tea.Sequence(tea.Println(notice), tea.ExecProcess(c, func(err error) tea.Msg {
 		if err != nil {
 			return opErrMsg{err: err}
@@ -285,7 +306,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
-		m.workspaces = buildWorkspaces(m.sessions, resolveHome())
+		m.workspaces = buildWorkspaces(m.sessions, m.home)
 		m.cursor = 0
 		m.workspaceCursor = 0
 		for i, ws := range m.workspaces {
@@ -350,6 +371,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = msg.err.Error()
 		return m, nil
 
+	case globalStatsLoadedMsg:
+		gs := msg.stats
+		m.globalStats = &gs
+		return m, nil
+
 	case tea.KeyMsg:
 		m.notice = "" // clear any transient notice on the next keypress
 		switch m.mode {
@@ -367,6 +393,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateYank(msg)
 		case ModeGoto:
 			return m.updateGoto(msg)
+		case ModeStats:
+			return m.updateStats(msg)
 		case ModeError:
 			return m.updateError(msg)
 		}

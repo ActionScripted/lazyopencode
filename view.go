@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -93,6 +92,10 @@ func (m model) View() string {
 
 	if m.mode == ModeWorkspaces {
 		return m.renderWorkspacesView(w, h)
+	}
+
+	if m.mode == ModeStats {
+		return m.renderStatsView(w, h)
 	}
 
 	if m.mode == ModeConfirmDeleteWorkspace {
@@ -273,9 +276,9 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 			header.WriteString(metaLabel("model"))
 			header.WriteString(st.Models[0])
 			header.WriteString("\n")
-			for _, model := range st.Models[1:] {
+			for _, mdl := range st.Models[1:] {
 				header.WriteString(strings.Repeat(" ", labelW))
-				header.WriteString(model)
+				header.WriteString(mdl)
 				header.WriteString("\n")
 			}
 		}
@@ -385,61 +388,6 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 	return paneStyle.Width(paneW).Height(height).Render(strings.TrimRight(header.String()+msgSection, "\n"))
 }
 
-// formatDuration formats a duration for display in the preview header.
-// Sub-minute durations show as "< 1m"; otherwise "Xh Ym" or "Ym".
-func formatDuration(d time.Duration) string {
-	if d < 0 {
-		d = 0
-	}
-	if d < time.Minute {
-		return "< 1m"
-	}
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	if h > 0 {
-		return fmt.Sprintf("%dh %dm", h, m)
-	}
-	return fmt.Sprintf("%dm", m)
-}
-
-// formatTokens formats a token count with K/M suffix.
-func formatTokens(n int) string {
-	switch {
-	case n >= 1_000_000:
-		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
-	case n >= 1_000:
-		return fmt.Sprintf("%.1fK", float64(n)/1_000)
-	default:
-		return fmt.Sprintf("%d", n)
-	}
-}
-
-// renderHintSegments parses a hint string of the form
-// "  key: desc   key: desc   bare" and returns a styled string where each key
-// is rendered in styleHintKey (white) and each description and separator is
-// rendered in styleDim.
-func renderHintSegments(hints string) string {
-	// Split on three-or-more spaces so multi-word keys/descs are kept intact.
-	segments := strings.Split(hints, "   ")
-	var sb strings.Builder
-	for i, seg := range segments {
-		if i == 0 {
-			// Leading padding / empty prefix — always dim.
-			sb.WriteString(styleDim.Render(seg))
-			continue
-		}
-		sb.WriteString(styleDim.Render("   "))
-		if idx := strings.Index(seg, ": "); idx != -1 {
-			sb.WriteString(styleHintKey.Render(seg[:idx]))
-			sb.WriteString(styleDim.Render(": " + seg[idx+2:]))
-		} else {
-			// No colon — treat as description only (e.g. "type to filter").
-			sb.WriteString(styleDim.Render(seg))
-		}
-	}
-	return sb.String()
-}
-
 // renderTopBar renders the single-row top border bar that pads the viewport
 // against window chrome (titlebars, tab bars, etc.) that may clip the top row.
 func renderTopBar(width int) string {
@@ -466,10 +414,12 @@ func (m model) renderHint(width int) string {
 			hints = "  d: directory   s: session id   esc: cancel"
 		case ModeGoto:
 			hints = "  s: shell   w: workspace   esc: cancel"
+		case ModeStats:
+			hints = "  esc: back"
 		case ModeError:
 			hints = "  q: quit"
 		default:
-			hints = "  j/k: up/down   enter: open   /: search   y: yank   g: goto   d: del   w: workspace   q: quit"
+			hints = "  j/k: up/down   enter: open   /: search   s: stats   y: yank   g: goto   d: del   w: workspace   q: quit"
 		}
 	}
 	dots := "  " +
@@ -491,6 +441,8 @@ func (m model) renderHint(width int) string {
 		badge = styleModeYank.Render("YANK")
 	case ModeGoto:
 		badge = styleModeGoto.Render("GOTO")
+	case ModeStats:
+		badge = styleModeStats.Render("STATS")
 	case ModeError:
 		badge = styleModeError.Render("ERROR")
 	default:
@@ -608,9 +560,9 @@ func formatSessionRow(s Session, width, pathColW int, selected bool) string {
 	// reset. By giving every span its own background we guarantee the highlight
 	// is unbroken across the full row width regardless of what other attributes
 	// (bold, color) individual cells carry.
-	base := lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
+	base := styleRowBase
 	if selected {
-		base = base.Background(colorSelected)
+		base = styleRowSelected
 	}
 
 	styledLead := base.Render(strings.Repeat(" ", leadSp))
@@ -688,6 +640,8 @@ func overlayModal(base, rendered string, w, h int) string {
 
 	return strings.Join(baseLines, "\n")
 }
+
+// ── Modals ────────────────────────────────────────────────────────────────────
 
 // renderGotoModal returns the styled modal for the g-prefix goto menu.
 func (m model) renderGotoModal() string {
@@ -782,159 +736,4 @@ func (m model) renderWorkspaceModal() string {
 		confirm
 
 	return styleModal.Render(content)
-}
-
-// ── Workspaces view ───────────────────────────────────────────────────────────
-
-// renderWorkspacesView is the top-level render for ModeWorkspaces.
-// Left pane: navigable list of unique workspace directories.
-// Right pane: read-only list of sessions belonging to the selected workspace.
-func (m model) renderWorkspacesView(w, h int) string {
-	hint := m.renderHint(w)
-	hintH := strings.Count(hint, "\n") + 1
-	topBar := renderTopBar(w)
-	bodyH := h - hintH - topBarH
-
-	// Secondary (right) pane takes the same share as the preview pane in the
-	// main view; primary (left) pane takes the remainder. Mirrors View()'s
-	// previewW / listW split but for the workspaces layout.
-	rightW := w * previewWidthPct / 100
-	if rightW < workspacesRightMinWidth {
-		rightW = workspacesRightMinWidth
-	}
-	leftW := w - rightW
-
-	left := styleListPane.Width(leftW).Height(bodyH).Render(m.renderWorkspaceList(leftW, bodyH))
-	right := m.renderWorkspaceSessions(rightW, bodyH)
-
-	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	return topBar + "\n" + body + "\n" + hint
-}
-
-// renderWorkspaceList renders the left pane: a scrollable list of workspace
-// directories, with the selected row highlighted.
-func (m model) renderWorkspaceList(width, height int) string {
-	var sb strings.Builder
-
-	// Header separator (mirrors the search bar separator in the sessions view).
-	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width)) + "\n")
-	height-- // consumed by separator
-
-	if len(m.workspaces) == 0 {
-		sb.WriteString(styleDim.Render("  no workspaces") + "\n")
-		return sb.String()
-	}
-
-	visibleStart := 0
-	if m.workspaceCursor >= height {
-		visibleStart = m.workspaceCursor - height + 1
-	}
-
-	for i := visibleStart; i < len(m.workspaces) && i < visibleStart+height; i++ {
-		ws := m.workspaces[i]
-		selected := i == m.workspaceCursor
-		sb.WriteString(formatWorkspaceRow(ws.DisplayDir, width, selected) + "\n")
-	}
-
-	return sb.String()
-}
-
-// formatWorkspaceRow renders a single workspace directory as a fixed-width row.
-// displayDir is the pre-computed display string (with "~" substitution).
-func formatWorkspaceRow(displayDir string, width int, selected bool) string {
-	const leadSp = 1
-	const trailSp = 1
-
-	innerW := width - leadSp - trailSp
-	if innerW < 1 {
-		innerW = 1
-	}
-	raw := truncate(displayDir, innerW)
-	padded := raw + strings.Repeat(" ", max(0, innerW-lipgloss.Width(raw)))
-
-	base := lipgloss.NewStyle().Foreground(colorCyan).Background(colorBgPanel)
-	if selected {
-		base = base.Background(colorSelected)
-	}
-
-	lead := base.Foreground(colorFg).Render(strings.Repeat(" ", leadSp))
-	text := base.Bold(selected).Render(padded)
-	trail := base.Foreground(colorFg).Render(strings.Repeat(" ", trailSp))
-
-	return lead + text + trail
-}
-
-// renderWorkspaceSessions renders the right pane: a read-only list of sessions
-// for the currently selected workspace.
-func (m model) renderWorkspaceSessions(width, height int) string {
-	paneW := width - paneHorizBorder  // same overhead as side-by-side preview
-	inner := paneW - paneHorizPadding // text area
-
-	if len(m.workspaces) == 0 {
-		return stylePreviewPane.Width(paneW).Height(height).Render(
-			styleDim.Render("no workspaces"),
-		)
-	}
-
-	selectedWS := m.workspaces[m.workspaceCursor]
-
-	// Filter sessions belonging to the selected workspace.
-	var wsSessions []Session
-	for _, s := range m.sessions {
-		if s.Directory == selectedWS.Dir {
-			wsSessions = append(wsSessions, s)
-		}
-	}
-
-	// ── header ────────────────────────────────────────────────────────────────
-	var header strings.Builder
-	header.WriteString(stylePreviewTitle.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(selectedWS.DisplayDir),
-	))
-	header.WriteString("\n")
-	header.WriteString(styleDim.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(
-			strings.Repeat("─", max(0, inner)),
-		),
-	))
-
-	// Compute header height dynamically so it never drifts out of sync with
-	// the header content (mirrors the approach used in renderPreview).
-	headerLines := strings.Count(header.String(), "\n") + 1
-	listHeight := height - headerLines
-	if listHeight < 1 {
-		listHeight = 1
-	}
-
-	// ── session rows ──────────────────────────────────────────────────────────
-	var sessionRows strings.Builder
-	if len(wsSessions) == 0 {
-		sessionRows.WriteString("\n" + styleDim.Render("  no sessions"))
-	} else {
-		for i, s := range wsSessions {
-			if i >= listHeight {
-				break
-			}
-			sessionRows.WriteString("\n" + formatWorkspaceSessionRow(s, inner))
-		}
-	}
-
-	return stylePreviewPane.Width(paneW).Height(height).Render(
-		header.String() + sessionRows.String(),
-	)
-}
-
-// formatWorkspaceSessionRow renders a compact session row for the workspaces
-// right pane. Layout: date(dateFullWidth) "  " title(remaining). No path column
-// needed since all sessions share the same workspace directory.
-func formatWorkspaceSessionRow(s Session, width int) string {
-	titleW := width - dateFullWidth - dateGap
-	if titleW < 1 {
-		titleW = 1
-	}
-
-	date := styleDim.Render(s.UpdatedAt.Format("2006-01-02 15:04"))
-	title := styleWorkspaceSessionTitle.Render(truncate(s.Title, titleW))
-
-	return date + strings.Repeat(" ", dateGap) + title
 }

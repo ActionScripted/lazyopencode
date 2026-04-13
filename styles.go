@@ -16,6 +16,7 @@ var (
 	colorYellow   = lipgloss.AdaptiveColor{Light: "#8f5e15", Dark: "#e0af68"} // Tokyo Night yellow
 	colorGreen    = lipgloss.AdaptiveColor{Light: "#33635c", Dark: "#9ece6a"} // Tokyo Night green
 	colorDanger   = lipgloss.AdaptiveColor{Light: "#c53b53", Dark: "#f7768e"} // Tokyo Night red
+	colorPurple   = lipgloss.AdaptiveColor{Light: "#5a4a78", Dark: "#bb9af7"} // Tokyo Night purple
 
 	// Text
 	styleDim    = lipgloss.NewStyle().Foreground(colorDim)
@@ -76,6 +77,12 @@ var (
 	styleAdd = lipgloss.NewStyle().Foreground(colorGreen)  // green
 	styleDel = lipgloss.NewStyle().Foreground(colorDanger) // red
 
+	// Panel-background variants of styleAdd/styleDel for use inside the stats
+	// dashboard where every span must carry colorBgPanel explicitly to prevent
+	// terminal-background bleed-through on ANSI reset sequences.
+	styleAddPanel = lipgloss.NewStyle().Foreground(colorGreen).Background(colorBgPanel)
+	styleDelPanel = lipgloss.NewStyle().Foreground(colorDanger).Background(colorBgPanel)
+
 	// Hint bar
 	styleHint = lipgloss.NewStyle().
 			Foreground(colorDim).
@@ -110,7 +117,20 @@ var (
 	styleModeYank          = styleBadgeBase.Background(colorGreen)
 	styleModeConfirmDelete = styleBadgeBase.Background(colorDanger)
 	styleModeGoto          = styleBadgeBase.Background(colorYellow)
+	styleModeStats         = styleBadgeBase.Background(colorPurple)
 	styleModeError         = styleBadgeBase.Background(colorDanger)
+
+	// Stats dashboard
+	// Uses *Panel variants throughout so every span carries colorBgPanel —
+	// in lipgloss v1.x the outer styleListPane.Background() only fills padding
+	// cells, so inner styled spans must carry the bg explicitly to prevent
+	// terminal-background bleed-through on ANSI reset sequences.
+	styleSpPanel          = lipgloss.NewStyle().Background(colorBgPanel)
+	styleDimPanel         = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
+	styleStatsTitlePanel  = lipgloss.NewStyle().Foreground(colorPurple).Bold(true).Background(colorBgPanel)
+	styleStatsLabelPanel  = lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
+	styleStatsCountPanel  = lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Background(colorBgPanel)
+	styleStatsHeaderPanel = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
 
 	// Modal containers (confirm-delete / yank / goto overlays)
 	styleModal = lipgloss.NewStyle().
@@ -138,4 +158,14 @@ var (
 	styleModalKeyYank   = styleBadgeBase.Background(colorCyan)
 	styleModalKeyGoto   = styleBadgeBase.Background(colorYellow)
 	styleModalKeyCancel = styleBadgeBase.Background(colorDim)
+)
+
+// Row base styles — non-selected and selected variants.
+// formatSessionRow and formatWorkspaceRow pick between these instead of
+// constructing lipgloss.NewStyle() inline.
+var (
+	styleRowBase         = lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
+	styleRowSelected     = lipgloss.NewStyle().Foreground(colorFg).Background(colorSelected)
+	styleWorkspaceRow    = lipgloss.NewStyle().Foreground(colorCyan).Background(colorBgPanel)
+	styleWorkspaceRowSel = lipgloss.NewStyle().Foreground(colorCyan).Background(colorSelected)
 )

@@ -37,7 +37,9 @@ func openReadOnlyDB(path string) (*sql.DB, bool, error) {
 // loadSessions opens the opencode SQLite database and returns all primary
 // sessions (parent_id IS NULL), ordered by most recently updated.
 // Returns an empty slice (not an error) if the database file does not exist.
-func loadSessions(dbPath string) ([]Session, error) {
+// home is the user's home directory (used for display path substitution) and
+// is passed explicitly so the function does not call os.UserHomeDir itself.
+func loadSessions(dbPath, home string) ([]Session, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
 		return nil, err
@@ -46,7 +48,6 @@ func loadSessions(dbPath string) ([]Session, error) {
 		return []Session{}, nil
 	}
 	defer func() { _ = db.Close() }()
-	home := resolveHome()
 	rows, err := db.Query(`
 		SELECT id, title, directory,
 		       time_created, time_updated,
@@ -227,4 +228,304 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 	}
 
 	return stats, nil
+}
+
+// loadGlobalStats returns aggregate statistics across all primary sessions
+// (parent_id IS NULL). Two windows are returned: all-time and last 7 days.
+// Non-fatal: returns a zero-value GlobalStats on any query error rather than
+// surfacing DB errors to the stats view.
+// home is the user's home directory (used for display path substitution) and
+// is passed explicitly so the function does not call os.UserHomeDir itself.
+func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
+	db, missing, err := openReadOnlyDB(dbPath)
+	if err != nil {
+		return GlobalStats{}, err
+	}
+	if missing {
+		return GlobalStats{}, nil
+	}
+	defer func() { _ = db.Close() }()
+
+	sevenDaysAgoMS := (time.Now().UnixMilli()) - (7 * 24 * 60 * 60 * 1000)
+
+	var gs GlobalStats
+
+	// ── All-time session totals (session table only) ──────────────────────────
+	if err := db.QueryRow(`
+		SELECT COUNT(*),
+		       COALESCE(SUM(COALESCE(summary_files,0)),0),
+		       COALESCE(SUM(COALESCE(summary_additions,0)),0),
+		       COALESCE(SUM(COALESCE(summary_deletions,0)),0),
+		       COALESCE(SUM(time_updated - time_created),0)
+		FROM session WHERE parent_id IS NULL
+	`).Scan(&gs.TotalSessions, &gs.TotalFiles, &gs.TotalAdditions, &gs.TotalDeletions, &gs.TotalDurationMS); err != nil {
+		return GlobalStats{}, fmt.Errorf("query total sessions: %w", err)
+	}
+
+	// ── All-time token + message totals (part step-finish) ───────────────────
+	var totalInput, totalOutput, totalCacheRead, totalCacheWrite *int
+	if err := db.QueryRow(`
+		SELECT COUNT(*),
+		       SUM(json_extract(p.data,'$.tokens.input')),
+		       SUM(json_extract(p.data,'$.tokens.output')),
+		       SUM(json_extract(p.data,'$.tokens.cache.read')),
+		       SUM(json_extract(p.data,'$.tokens.cache.write'))
+		FROM part p
+		WHERE json_extract(p.data,'$.type') = 'step-finish'
+		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
+	`).Scan(&gs.TotalMessages, &totalInput, &totalOutput, &totalCacheRead, &totalCacheWrite); err != nil {
+		return GlobalStats{}, fmt.Errorf("query total tokens: %w", err)
+	}
+	if totalInput != nil {
+		gs.TotalInput = *totalInput
+	}
+	if totalOutput != nil {
+		gs.TotalOutput = *totalOutput
+	}
+	if totalCacheRead != nil {
+		gs.TotalCacheRead = *totalCacheRead
+	}
+	if totalCacheWrite != nil {
+		gs.TotalCacheWrite = *totalCacheWrite
+	}
+
+	// ── Recent session totals (last 7 days) ───────────────────────────────────
+	if err := db.QueryRow(`
+		SELECT COUNT(*),
+		       COALESCE(SUM(COALESCE(summary_files,0)),0),
+		       COALESCE(SUM(COALESCE(summary_additions,0)),0),
+		       COALESCE(SUM(COALESCE(summary_deletions,0)),0),
+		       COALESCE(SUM(time_updated - time_created),0)
+		FROM session WHERE parent_id IS NULL AND time_created > ?
+	`, sevenDaysAgoMS).Scan(&gs.RecentSessions, &gs.RecentFiles, &gs.RecentAdditions, &gs.RecentDeletions, &gs.RecentDurationMS); err != nil {
+		return GlobalStats{}, fmt.Errorf("query recent sessions: %w", err)
+	}
+
+	var recentInput, recentOutput, recentCacheRead, recentCacheWrite *int
+	if err := db.QueryRow(`
+		SELECT COUNT(*),
+		       SUM(json_extract(p.data,'$.tokens.input')),
+		       SUM(json_extract(p.data,'$.tokens.output')),
+		       SUM(json_extract(p.data,'$.tokens.cache.read')),
+		       SUM(json_extract(p.data,'$.tokens.cache.write'))
+		FROM part p
+		WHERE json_extract(p.data,'$.type') = 'step-finish'
+		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
+	`, sevenDaysAgoMS).Scan(&gs.RecentMessages, &recentInput, &recentOutput, &recentCacheRead, &recentCacheWrite); err != nil {
+		return GlobalStats{}, fmt.Errorf("query recent tokens: %w", err)
+	}
+	if recentInput != nil {
+		gs.RecentInput = *recentInput
+	}
+	if recentOutput != nil {
+		gs.RecentOutput = *recentOutput
+	}
+	if recentCacheRead != nil {
+		gs.RecentCacheRead = *recentCacheRead
+	}
+	if recentCacheWrite != nil {
+		gs.RecentCacheWrite = *recentCacheWrite
+	}
+
+	// ── Model breakdown ───────────────────────────────────────────────────────
+	modelRows, err := db.Query(`
+		SELECT COALESCE(
+		           json_extract(m.data,'$.modelID'),
+		           json_extract(m.data,'$.model.modelID'),
+		           'unknown'
+		       ) AS model_name,
+		       COUNT(DISTINCT m.session_id),
+		       COUNT(p.id),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
+		       COALESCE((
+		           SELECT SUM(s.time_updated - s.time_created)
+		           FROM session s
+		           WHERE s.parent_id IS NULL
+		             AND s.id IN (
+		                 SELECT DISTINCT m2.session_id
+		                 FROM message m2
+		                 WHERE json_extract(m2.data,'$.role') = 'assistant'
+		                   AND COALESCE(
+		                           json_extract(m2.data,'$.modelID'),
+		                           json_extract(m2.data,'$.model.modelID'),
+		                           'unknown'
+		                       ) = model_name
+		                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
+		             )
+		       ), 0)
+		FROM message m
+		JOIN part p ON p.session_id = m.session_id
+		          AND json_extract(p.data,'$.type') = 'step-finish'
+		WHERE json_extract(m.data,'$.role') = 'assistant'
+		  AND m.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
+		GROUP BY 1
+		ORDER BY 2 DESC
+	`)
+	if err != nil {
+		return GlobalStats{}, fmt.Errorf("query models: %w", err)
+	}
+	defer func() { _ = modelRows.Close() }()
+	for modelRows.Next() {
+		var ms ModelStat
+		if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+			return GlobalStats{}, fmt.Errorf("scan model stat: %w", err)
+		}
+		gs.Models = append(gs.Models, ms)
+	}
+	if err := modelRows.Err(); err != nil {
+		return GlobalStats{}, fmt.Errorf("iterate models: %w", err)
+	}
+
+	// ── Project breakdown (top 10 by session count) ───────────────────────────
+	projRows, err := db.Query(`
+		SELECT s.directory,
+		       COUNT(DISTINCT s.id) AS cnt,
+		       COUNT(p.id),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
+		       COALESCE(SUM(s.time_updated - s.time_created),0)
+		FROM session s
+		LEFT JOIN part p ON p.session_id = s.id
+		    AND json_extract(p.data,'$.type') = 'step-finish'
+		WHERE s.parent_id IS NULL
+		GROUP BY s.directory
+		ORDER BY cnt DESC
+		LIMIT 10
+	`)
+	if err != nil {
+		return GlobalStats{}, fmt.Errorf("query projects: %w", err)
+	}
+	defer func() { _ = projRows.Close() }()
+	for projRows.Next() {
+		var ps ProjectStat
+		if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Turns, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
+			return GlobalStats{}, fmt.Errorf("scan project stat: %w", err)
+		}
+		ps.DisplayDir = homeToTilde(ps.Dir, home)
+		gs.Projects = append(gs.Projects, ps)
+	}
+	if err := projRows.Err(); err != nil {
+		return GlobalStats{}, fmt.Errorf("iterate projects: %w", err)
+	}
+
+	// ── Per-project model breakdown ───────────────────────────────────────────
+	// Build a set of the top-10 project directories so we can filter the query.
+	if len(gs.Projects) > 0 {
+		projModelRows, err := db.Query(`
+			SELECT s.directory,
+			       COALESCE(
+			           json_extract(m.data,'$.modelID'),
+			           json_extract(m.data,'$.model.modelID'),
+			           'unknown'
+			       ) AS model_name,
+			       COUNT(DISTINCT s.id),
+			       COUNT(p.id),
+			       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
+			       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
+			       COALESCE((
+			           SELECT SUM(s2.time_updated - s2.time_created)
+			           FROM session s2
+			           WHERE s2.parent_id IS NULL
+			             AND s2.directory = s.directory
+			             AND s2.id IN (
+			                 SELECT DISTINCT m2.session_id
+			                 FROM message m2
+			                 WHERE json_extract(m2.data,'$.role') = 'assistant'
+			                   AND COALESCE(
+			                           json_extract(m2.data,'$.modelID'),
+			                           json_extract(m2.data,'$.model.modelID'),
+			                           'unknown'
+			                       ) = model_name
+			                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
+			             )
+			       ), 0)
+			FROM session s
+			JOIN message m ON m.session_id = s.id
+			    AND json_extract(m.data,'$.role') = 'assistant'
+			JOIN part p ON p.session_id = s.id
+			    AND json_extract(p.data,'$.type') = 'step-finish'
+			WHERE s.parent_id IS NULL
+			  AND s.directory IN (
+			      SELECT directory FROM session WHERE parent_id IS NULL
+			      GROUP BY directory ORDER BY COUNT(*) DESC LIMIT 10
+			  )
+			GROUP BY s.directory, model_name
+			ORDER BY s.directory, 3 DESC
+		`)
+		if err != nil {
+			return GlobalStats{}, fmt.Errorf("query project models: %w", err)
+		}
+		defer func() { _ = projModelRows.Close() }()
+
+		// Build map[dir][]ModelStat then attach to each ProjectStat.
+		projModels := make(map[string][]ModelStat, len(gs.Projects))
+		for projModelRows.Next() {
+			var dir string
+			var ms ModelStat
+			if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+				return GlobalStats{}, fmt.Errorf("scan project model stat: %w", err)
+			}
+			projModels[dir] = append(projModels[dir], ms)
+		}
+		if err := projModelRows.Err(); err != nil {
+			return GlobalStats{}, fmt.Errorf("iterate project models: %w", err)
+		}
+		for i, ps := range gs.Projects {
+			gs.Projects[i].Models = projModels[ps.Dir]
+		}
+	}
+
+	// ── Recent model breakdown (last 7 days) ──────────────────────────────────
+	recentModelRows, err := db.Query(`
+		SELECT COALESCE(
+		           json_extract(m.data,'$.modelID'),
+		           json_extract(m.data,'$.model.modelID'),
+		           'unknown'
+		       ) AS model_name,
+		       COUNT(DISTINCT m.session_id),
+		       COUNT(p.id),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
+		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
+		       COALESCE((
+		           SELECT SUM(s.time_updated - s.time_created)
+		           FROM session s
+		           WHERE s.parent_id IS NULL
+		             AND s.time_created > ?
+		             AND s.id IN (
+		                 SELECT DISTINCT m2.session_id
+		                 FROM message m2
+		                 WHERE json_extract(m2.data,'$.role') = 'assistant'
+		                   AND COALESCE(
+		                           json_extract(m2.data,'$.modelID'),
+		                           json_extract(m2.data,'$.model.modelID'),
+		                           'unknown'
+		                       ) = model_name
+		                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
+		             )
+		       ), 0)
+		FROM message m
+		JOIN part p ON p.session_id = m.session_id
+		          AND json_extract(p.data,'$.type') = 'step-finish'
+		WHERE json_extract(m.data,'$.role') = 'assistant'
+		  AND m.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
+		GROUP BY 1
+		ORDER BY 2 DESC
+	`, sevenDaysAgoMS, sevenDaysAgoMS, sevenDaysAgoMS)
+	if err != nil {
+		return GlobalStats{}, fmt.Errorf("query recent models: %w", err)
+	}
+	defer func() { _ = recentModelRows.Close() }()
+	for recentModelRows.Next() {
+		var ms ModelStat
+		if err := recentModelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+			return GlobalStats{}, fmt.Errorf("scan recent model stat: %w", err)
+		}
+		gs.RecentModels = append(gs.RecentModels, ms)
+	}
+	if err := recentModelRows.Err(); err != nil {
+		return GlobalStats{}, fmt.Errorf("iterate recent models: %w", err)
+	}
+
+	return gs, nil
 }

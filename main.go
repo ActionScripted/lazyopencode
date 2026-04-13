@@ -4,7 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"os/exec"
+	"strings"
 	"text/tabwriter"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,12 +37,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	home, err := os.UserHomeDir()
+	out, err := exec.Command("opencode", "db", "path").Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "lazyopencode: could not resolve home directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "lazyopencode: could not resolve opencode DB path (is opencode in PATH?): %v\n", err)
 		os.Exit(1)
 	}
-	dbPath := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
+	dbPath := strings.TrimSpace(string(out))
+	if dbPath == "" {
+		fmt.Fprintf(os.Stderr, "lazyopencode: opencode db path returned empty output\n")
+		os.Exit(1)
+	}
 
 	p := tea.NewProgram(
 		newModel(dbPath, *demo),

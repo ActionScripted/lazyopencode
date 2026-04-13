@@ -15,13 +15,17 @@ lazyopencode is a terminal UI (TUI) for managing [opencode](https://opencode.ai)
 | File | Purpose |
 |------|---------|
 | `main.go` | Entry point; resolves the DB path and starts the Bubble Tea program |
-| `model.go` | App state (`model` struct), `Init`/`Update` logic, all command constructors (`loadMessagesForCursor`, `loadSessionsCmd`, `openSessionCmd`, etc.), message types |
-| `view.go` | `View` function and pure render utilities (`formatSessionRow`, `truncate`, etc.) |
-| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`, `updateWorkspaces`, `updateConfirmDelete`, `updateConfirmDeleteWorkspace`, `updateGoto`); `clamp` |
+| `model.go` | App state (`model` struct), `Init`/`Update` logic, all command constructors (`loadMessagesForCursor`, `loadSessionsCmd`, `openSessionCmd`, etc.), message types, `resolveHome` |
+| `view.go` | Layout constants, `View()`, `renderList`, `renderPreview`, `renderHint`, `renderTopBar`, `formatSessionRow`, `overlayModal`, all modals, `truncate` |
+| `view_workspaces.go` | `renderWorkspacesView`, `renderWorkspaceList`, `formatWorkspaceRow`, `renderWorkspaceSessions`, `formatWorkspaceSessionRow` |
+| `view_stats.go` | `renderStatsView`, `renderStats`, `renderSectionRule`, `renderTableRule`, `renderFieldset`, `buildSummaryKV`, `buildModelRows`, `renderModelHeader`, `renderModelRows`, `buildProjectRows`, `renderProjectHeader`, `renderProjectRows`, `padRight` |
+| `view_format.go` | `formatDuration`, `formatDurationMS`, `fmtCommas`, `formatTokens`, `fmtCost`, `modelCost`, `modelPricing`, `knownModelPricing`, `renderHintSegments` |
+| `update.go` | Key handler helpers (`updateNormal`, `updateSearch`, `updateWorkspaces`, `updateConfirmDelete`, `updateConfirmDeleteWorkspace`, `updateGoto`, `updateStats`, `updateError`, `updateYank`); `clamp` |
 | `keys.go` | Key bindings (`KeyMap`) and `Mode` enum |
-| `session.go` | `Session` and `Message` types; `homeToTilde` and `baseName` helpers; `filterSessions`, `buildWorkspaces`, `removeSessionByID` |
-| `db.go` | SQLite queries — `loadSessions` and `loadMessages`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
-| `styles.go` | Lip Gloss style definitions |
+| `session.go` | `Session`, `Message`, `SessionStats`, `ModelStat`, `ProjectStat`, `GlobalStats` types; `homeToTilde`, `baseName` helpers; `filterSessions`, `buildWorkspaces`, `removeSessionByID` |
+| `db.go` | SQLite queries — `openReadOnlyDB`, `loadSessions`, `loadMessages`, `loadStats`, `loadGlobalStats`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
+| `demo.go` | `demoSessions`, `demoMessages`, `demoStats`, `demoGlobalStats`, `demoFeaturedMessages` — hardcoded fake data for `--demo` mode |
+| `styles.go` | Lip Gloss color vars, style definitions, and panel-background style variants; all package-level `var`s |
 | `Makefile` | `build`, `install`, `fmt`, `vet`, `lint`, `test`, `check` targets |
 | `.golangci.yml` | golangci-lint configuration |
 | `.editorconfig` | Editor conventions (tabs, UTF-8, trailing newlines) |
@@ -59,6 +63,10 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 | Add a new display mode | `keys.go`, `model.go`, `update.go`, `view.go` |
 | Add a session or message field | `session.go` + `db.go` |
 | Add a pure session/workspace helper | `session.go` only |
+| Add a cost/pricing helper | `view_format.go` only (`modelCost`, `fmtCost`) |
+| Add a workspace render function | `view_workspaces.go` only |
+| Add a stats render function | `view_stats.go` only |
+| Add or edit demo/fake data | `demo.go` only |
 | Change lint rules | `.golangci.yml` only |
 | Change editor conventions | `.editorconfig` only |
 
@@ -84,7 +92,7 @@ Run `make check` before committing — it runs `fmt`, `vet`, `lint`, and `test` 
 | `make test` | Runs `go test ./...` |
 | `make check` | Runs all of the above in order |
 
-Lint rules live in `.golangci.yml`. The active linters are `govet`, `staticcheck` (which subsumes `gosimple`), `errcheck`, `unused`, `gofmt`, `goimports`, `misspell`, and `revive`. `revive` is configured without the exported-symbol doc-comment rule. To adjust linters or tweak rule severity, edit `.golangci.yml` only.
+Lint rules live in `.golangci.yml`. The active linters are `errcheck`, `govet`, `misspell`, `nolintlint`, `revive`, `staticcheck`, and `unused`. Formatters (`gofmt`, `goimports`) are configured separately under the `formatters` key (golangci-lint v2 format). `revive` is configured without the exported-symbol doc-comment rule. `nolintlint` requires every `//nolint` directive to name the specific linter and include a justification comment. To adjust linters or tweak rule severity, edit `.golangci.yml` only.
 
 Install required dev tools:
 
