@@ -29,6 +29,9 @@ const (
 	tblTimeWC              = 4   // compact time column (normal: 8)
 	tblGapC                = 2   // compact gap between columns (normal: 3)
 
+	// Cost column — same width in both normal and compact layouts.
+	tblCostW = 9 // fits "$9,999.99"
+
 	// Fieldset padding (inside the border, each side).
 	fieldsetPadX = 2
 
@@ -48,6 +51,7 @@ type statsTableRow struct {
 	inputTokens int
 	outTokens   int
 	durationMS  int64
+	cost        float64
 	// subRows is non-nil for project rows; each entry is a model sub-row.
 	subRows []statsTableRow
 }
@@ -82,9 +86,8 @@ func (m model) renderStats(w, h int) string {
 
 	// ── KV summary fieldsets ───────────────────────────────────────────────────
 
-	// avail is the usable content width (inside the 2-space left indent,
-	// leaving a 1-char right margin so table content doesn't kiss the edge).
-	avail := w - indent - 1
+	// avail is the usable content width (inside the 2-space left indent).
+	avail := w - indent
 	if avail < 1 {
 		avail = 1
 	}
@@ -107,6 +110,7 @@ func (m model) renderStats(w, h int) string {
 			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
 			durationMS: gs.TotalDurationMS,
 			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
+			cost:   gs.TotalCost,
 			innerW: innerW,
 		})
 		recentKV := buildSummaryKV(summaryData{
@@ -115,6 +119,7 @@ func (m model) renderStats(w, h int) string {
 			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
 			durationMS: gs.RecentDurationMS,
 			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
+			cost:   gs.RecentCost,
 			innerW: innerW,
 		})
 
@@ -144,6 +149,7 @@ func (m model) renderStats(w, h int) string {
 			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
 			durationMS: gs.TotalDurationMS,
 			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
+			cost:   gs.TotalCost,
 			innerW: innerW,
 		})
 		recentKV := buildSummaryKV(summaryData{
@@ -152,6 +158,7 @@ func (m model) renderStats(w, h int) string {
 			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
 			durationMS: gs.RecentDurationMS,
 			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
+			cost:   gs.RecentCost,
 			innerW: innerW,
 		})
 
@@ -167,9 +174,9 @@ func (m model) renderStats(w, h int) string {
 	// and data rows; +1 for the trailing space after the rightmost column.
 	var fixedW int
 	if compact {
-		fixedW = tblGapC + tblSessWC + tblGapC + tblPrmtWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblNameIndent + 1
+		fixedW = tblGapC + tblSessWC + tblGapC + tblPrmtWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostW + tblNameIndent + 1
 	} else {
-		fixedW = tblGap + tblSessW + tblGap + tblPrmtW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblNameIndent + 1
+		fixedW = tblGap + tblSessW + tblGap + tblPrmtW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
 	}
 
 	// ── Models table ──────────────────────────────────────────────────────────
@@ -318,6 +325,7 @@ type summaryData struct {
 	cacheRead, cacheWrite       int
 	durationMS                  int64
 	files, additions, deletions int
+	cost                        float64
 	innerW                      int
 }
 
@@ -368,6 +376,8 @@ func buildSummaryKV(d summaryData) string {
 		blank,
 		kv("total time", formatDurationMS(d.durationMS)),
 		kv("avg time", perSession),
+		blank,
+		kv("cost", formatCost(d.cost)),
 		blank,
 		kv("files", formatCommas(d.files)),
 		kv("changes", changes),
@@ -444,12 +454,14 @@ func renderTableHeader(pad string, nameW int, compact bool) string {
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblPrmtWC, "prmt")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
 	} else {
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblPrmtW, "prompts")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
 	}
 	sb.WriteString(styleSpPanel.Render(" "))
 	sb.WriteString("\n")
@@ -465,12 +477,14 @@ func renderTableCols(sb *strings.Builder, r statsTableRow, g string, compact boo
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblPrmtWC, r.prompts)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, formatCost(r.cost))))
 	} else {
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblPrmtW, r.prompts)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, formatCost(r.cost))))
 	}
 }
 

@@ -269,6 +269,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		files, additions, deletions          int
 		input, output, cacheRead, cacheWrite int
 		durationMS                           int64
+		cost                                 float64
 		err                                  error
 	}
 	type breakdownResult struct {
@@ -294,6 +295,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		// Token sums come from assistant rows; prompt count from user rows.
 		var r allTimeResult
 		var input, output, cacheRead, cacheWrite *int
+		var cost *float64
 		err = db.QueryRow(`
 			SELECT
 			    COUNT(DISTINCT s.id),
@@ -307,7 +309,8 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    SUM(json_extract(m.data,'$.tokens.input')),
 			    SUM(json_extract(m.data,'$.tokens.output')),
 			    SUM(json_extract(m.data,'$.tokens.cache.read')),
-			    SUM(json_extract(m.data,'$.tokens.cache.write'))
+			    SUM(json_extract(m.data,'$.tokens.cache.write')),
+			    SUM(json_extract(m.data,'$.cost'))
 			FROM session s
 			LEFT JOIN message m ON m.session_id = s.id
 			    AND json_extract(m.data,'$.role') = 'assistant'
@@ -315,7 +318,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		`).Scan(
 			&r.gs.TotalSessions, &r.gs.TotalFiles, &r.gs.TotalAdditions,
 			&r.gs.TotalDeletions, &r.gs.TotalDurationMS,
-			&r.gs.TotalPrompts, &input, &output, &cacheRead, &cacheWrite,
+			&r.gs.TotalPrompts, &input, &output, &cacheRead, &cacheWrite, &cost,
 		)
 		if err != nil {
 			allTimeCh <- allTimeResult{err: fmt.Errorf("query all-time totals: %w", err)}
@@ -333,6 +336,9 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		if cacheWrite != nil {
 			r.gs.TotalCacheWrite = *cacheWrite
 		}
+		if cost != nil {
+			r.gs.TotalCost = *cost
+		}
 		allTimeCh <- r
 	}()
 
@@ -347,6 +353,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 
 		var r recentResult
 		var input, output, cacheRead, cacheWrite *int
+		var cost *float64
 		err = db.QueryRow(`
 			SELECT
 			    COUNT(DISTINCT s.id),
@@ -361,14 +368,15 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    SUM(json_extract(m.data,'$.tokens.input')),
 			    SUM(json_extract(m.data,'$.tokens.output')),
 			    SUM(json_extract(m.data,'$.tokens.cache.read')),
-			    SUM(json_extract(m.data,'$.tokens.cache.write'))
+			    SUM(json_extract(m.data,'$.tokens.cache.write')),
+			    SUM(json_extract(m.data,'$.cost'))
 			FROM session s
 			LEFT JOIN message m ON m.session_id = s.id
 			    AND json_extract(m.data,'$.role') = 'assistant'
 			WHERE s.parent_id IS NULL AND s.time_created > ?
 		`, sevenDaysAgoMS, sevenDaysAgoMS).Scan(
 			&r.sessions, &r.files, &r.additions, &r.deletions, &r.durationMS,
-			&r.prompts, &input, &output, &cacheRead, &cacheWrite,
+			&r.prompts, &input, &output, &cacheRead, &cacheWrite, &cost,
 		)
 		if err != nil {
 			recentCh <- recentResult{err: fmt.Errorf("query recent totals: %w", err)}
@@ -385,6 +393,9 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		}
 		if cacheWrite != nil {
 			r.cacheWrite = *cacheWrite
+		}
+		if cost != nil {
+			r.cost = *cost
 		}
 		recentCh <- r
 	}()
@@ -415,7 +426,8 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
-			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
+			    COALESCE(SUM(json_extract(m.data,'$.cost')),0)
 			FROM message m
 			JOIN session s ON s.id = m.session_id AND s.parent_id IS NULL
 			WHERE json_extract(m.data,'$.role') = 'assistant'
@@ -429,7 +441,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		defer func() { _ = modelRows.Close() }()
 		for modelRows.Next() {
 			var ms modelStat
-			if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+			if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS, &ms.Cost); err != nil {
 				breakdownCh <- breakdownResult{err: fmt.Errorf("scan model stat: %w", err)}
 				return
 			}
@@ -449,7 +461,8 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
-			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
+			    COALESCE(SUM(json_extract(m.data,'$.cost')),0)
 			FROM session s
 			LEFT JOIN message m ON m.session_id = s.id
 			    AND json_extract(m.data,'$.role') = 'assistant'
@@ -465,7 +478,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		defer func() { _ = projRows.Close() }()
 		for projRows.Next() {
 			var ps projectStat
-			if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Prompts, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
+			if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Prompts, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS, &ps.Cost); err != nil {
 				breakdownCh <- breakdownResult{err: fmt.Errorf("scan project stat: %w", err)}
 				return
 			}
@@ -491,7 +504,8 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 				    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 				    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 				    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
-				    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+				    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
+				    COALESCE(SUM(json_extract(m.data,'$.cost')),0)
 				FROM message m
 				JOIN session s ON s.id = m.session_id AND s.parent_id IS NULL
 				WHERE json_extract(m.data,'$.role') = 'assistant'
@@ -512,7 +526,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			for projModelRows.Next() {
 				var dir string
 				var ms modelStat
-				if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+				if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS, &ms.Cost); err != nil {
 					breakdownCh <- breakdownResult{err: fmt.Errorf("scan project model stat: %w", err)}
 					return
 				}
@@ -551,6 +565,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 	gs.RecentOutput = recRes.output
 	gs.RecentCacheRead = recRes.cacheRead
 	gs.RecentCacheWrite = recRes.cacheWrite
+	gs.RecentCost = recRes.cost
 
 	bdRes := <-breakdownCh
 	if bdRes.err != nil {

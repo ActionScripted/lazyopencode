@@ -88,6 +88,12 @@ func formatTokensMerged(input, output int) string {
 	return formatTokens(input) + "/" + formatTokens(output)
 }
 
+// formatCost formats a dollar cost as "$0.00" with exactly two decimal places.
+// It only formats the value opencode stores in $.cost — no calculation is done.
+func formatCost(cost float64) string {
+	return fmt.Sprintf("$%.2f", cost)
+}
+
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
 // renderHintSegments parses a hint string of the form

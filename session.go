@@ -41,7 +41,8 @@ type modelStat struct {
 	Prompts      int // count of distinct user prompts responded to by this model
 	InputTokens  int
 	OutputTokens int
-	DurationMS   int64 // sum of (time_updated - time_created) for sessions using this model
+	DurationMS   int64   // sum of (time_updated - time_created) for sessions using this model
+	Cost         float64 // sum of $.cost from opencode's message data
 }
 
 // projectStat holds aggregate stats for a project directory.
@@ -53,6 +54,7 @@ type projectStat struct {
 	InputTokens  int
 	OutputTokens int
 	DurationMS   int64
+	Cost         float64     // sum of $.cost from opencode's message data
 	Models       []modelStat // per-model breakdown within this project, ordered by session count desc
 }
 
@@ -68,7 +70,8 @@ type globalStats struct {
 	TotalFiles      int
 	TotalAdditions  int
 	TotalDeletions  int
-	TotalDurationMS int64 // sum of (time_updated - time_created) across all sessions
+	TotalDurationMS int64   // sum of (time_updated - time_created) across all sessions
+	TotalCost       float64 // sum of $.cost from opencode's message data, all time
 	// Last-7-days totals
 	RecentSessions   int
 	RecentPrompts    int // count of user messages in the last 7 days
@@ -80,6 +83,7 @@ type globalStats struct {
 	RecentAdditions  int
 	RecentDeletions  int
 	RecentDurationMS int64
+	RecentCost       float64 // sum of $.cost from opencode's message data, last 7 days
 	// Breakdowns
 	Models   []modelStat   // all-time, ordered by session count desc
 	Projects []projectStat // top 10, ordered by session count desc
