@@ -16,6 +16,7 @@ type session struct {
 	UpdatedAt  time.Time
 	DisplayDir string // Directory with home replaced by "~"; computed at load time
 	ShortDir   string // Last path component (or "~"); computed at load time
+	FilterKey  string // lowercase Title + " " + Directory; computed at load time for fast search
 
 	// Summary fields from the session row; zero for pure-chat sessions.
 	SummaryFiles     int
@@ -138,7 +139,7 @@ func baseName(dir, home string) string {
 }
 
 // filterSessions returns the subset of sessions matching query
-// against each session's FilterValue (title + directory).
+// against each session's FilterKey (pre-lowercased title + directory).
 // Always returns an independent slice — callers may safely append to or modify
 // the result without aliasing m.sessions.
 func filterSessions(sessions []session, query string) []session {
@@ -148,7 +149,7 @@ func filterSessions(sessions []session, query string) []session {
 	q := strings.ToLower(query)
 	out := make([]session, 0, len(sessions))
 	for _, s := range sessions {
-		if strings.Contains(strings.ToLower(s.FilterValue()), q) {
+		if strings.Contains(s.FilterKey, q) {
 			out = append(out, s)
 		}
 	}

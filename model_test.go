@@ -169,14 +169,11 @@ func TestLoadStatsCmd_ReturnsStatsLoadedMsg(t *testing.T) {
 	path := createTestDB(t)
 
 	db := openRW(t, path)
-	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES ('m1', 'sess-1', '{"role":"user"}')`)
+	// Token data lives in assistant message rows ($.tokens.*).
+	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
+		('m1', 'sess-1', '{"role":"assistant","tokens":{"output":42,"total":500}}')`)
 	if err != nil {
 		t.Fatalf("insert message: %v", err)
-	}
-	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
-		('p1', 'm1', 'sess-1', '{"type":"step-finish","tokens":{"output":42,"total":500}}', 1000)`)
-	if err != nil {
-		t.Fatalf("insert part: %v", err)
 	}
 	_ = db.Close()
 

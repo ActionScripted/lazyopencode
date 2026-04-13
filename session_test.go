@@ -3,13 +3,19 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 // makeSession is a convenience constructor for tests that only care about a
 // subset of session fields.
 func makeSession(id, title, dir string) session {
-	return session{ID: id, Title: title, Directory: dir}
+	return session{
+		ID:        id,
+		Title:     title,
+		Directory: dir,
+		FilterKey: strings.ToLower(title + " " + dir),
+	}
 }
 
 // ---------------------------------------------------------------------------

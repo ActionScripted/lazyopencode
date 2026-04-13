@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -17,7 +18,7 @@ func demoSessions() []session {
 	now := time.Now()
 	h := func(hours float64) time.Time { return now.Add(-time.Duration(hours * float64(time.Hour))) }
 
-	return []session{
+	sessions := []session{
 		{
 			ID:               "demo-001",
 			Title:            "add fake data for screenshot",
@@ -319,6 +320,10 @@ func demoSessions() []session {
 			SummaryDeletions: 4201,
 		},
 	}
+	for i := range sessions {
+		sessions[i].FilterKey = strings.ToLower(sessions[i].Title + " " + sessions[i].Directory)
+	}
+	return sessions
 }
 
 // demoMessages returns fake chat messages for --demo mode.

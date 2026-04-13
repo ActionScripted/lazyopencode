@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // sessionsLoadedMsg carries sessions fetched from the DB.
@@ -95,6 +96,7 @@ type model struct {
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
 	globalStats            *globalStats  // cached aggregate stats; nil until first load
 	statsScrollOffset      int           // scroll position (in lines) for the stats view
+	pathColW               int           // cached path column width for renderList; recomputed whenever m.filtered changes
 }
 
 func newModel(dbPath string, demoMode bool) model {
@@ -172,6 +174,21 @@ func (m model) loadGlobalStatsCmd() tea.Cmd {
 		}
 		return globalStatsLoadedMsg{stats: stats}
 	}
+}
+
+// recomputePathColW recomputes m.pathColW from the current m.filtered slice.
+// Must be called whenever m.filtered is reassigned. The cap is intentionally
+// NOT applied here because it depends on the pane width, which is only known
+// at render time; renderList reads m.pathColW and caps it there.
+func (m model) recomputePathColW() model {
+	w := 0
+	for _, s := range m.filtered {
+		if n := lipgloss.Width(s.ShortDirectory()); n > w {
+			w = n
+		}
+	}
+	m.pathColW = w
+	return m
 }
 
 // loadMessagesForCursor returns an updated model with a batched command to
@@ -308,6 +325,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = msg.sessions
 		m.filtered = filterSessions(m.sessions, m.search.Value())
 		m.workspaces = buildWorkspaces(m.sessions, m.home)
+		m = m.recomputePathColW()
 		m.cursor = 0
 		m.workspaceCursor = 0
 		for i, ws := range m.workspaces {

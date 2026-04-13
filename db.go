@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -78,6 +79,7 @@ func loadSessions(dbPath, home string) ([]session, error) {
 		s.UpdatedAt = time.Unix(updatedMS/1000, (updatedMS%1000)*int64(time.Millisecond))
 		s.DisplayDir = homeToTilde(s.Directory, home)
 		s.ShortDir = baseName(s.Directory, home)
+		s.FilterKey = strings.ToLower(s.Title + " " + s.Directory)
 		sessions = append(sessions, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -136,11 +138,11 @@ func loadMessages(dbPath, sessionID string) ([]message, error) {
 }
 
 // loadStats returns aggregated statistics for a single session by querying the
-// part table. Two correlated subqueries keep it to a single round-trip:
-//   - output_tokens: sum of tokens.output across all step-finish parts
-//   - context_tokens: tokens.total from the most recent step-finish part
+// message table. A single query with conditional aggregation collects the
+// message count, token sums, and the context-window size from the last
+// assistant turn — all without touching the part table.
 //
-// Returns a zero-value sessionStats (not an error) if no step-finish parts
+// Returns a zero-value sessionStats (not an error) if no assistant messages
 // exist (pure chat sessions with no model calls).
 func loadStats(dbPath, sessionID string) (sessionStats, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
@@ -153,34 +155,35 @@ func loadStats(dbPath, sessionID string) (sessionStats, error) {
 	defer func() { _ = db.Close() }()
 
 	var stats sessionStats
-	var inputTokens, outputTokens, contextTokens *int // nullable — NULL when no step-finish parts
+	var inputTokens, outputTokens, contextTokens *int // nullable — NULL when no assistant messages
 
+	// Single scan over the message table:
+	//   COUNT(DISTINCT id)        → total messages (user + assistant)
+	//   SUM(tokens.input)         → cumulative input tokens (assistant rows only)
+	//   SUM(tokens.output)        → cumulative output tokens (assistant rows only)
+	//   MAX(CASE … END)           → tokens.total from the *last* assistant row
+	//     (MAX over a monotonically increasing rowid picks the latest row when
+	//      combined with the CASE that zeroes out all but the max-rowid row;
+	//      a simpler subquery approach is cleaner — use a correlated MAX rowid.)
+	//
+	// Context tokens: we need tokens.total from the assistant message with the
+	// highest rowid. A single-pass trick: join a subquery that returns only
+	// the last assistant rowid.
 	err = db.QueryRow(`
 		SELECT
 		    COUNT(DISTINCT m.id),
-		    (
-		        SELECT SUM(json_extract(p2.data, '$.tokens.input'))
-		        FROM part p2
-		        WHERE p2.session_id = ?
-		          AND json_extract(p2.data, '$.type') = 'step-finish'
-		    ),
-		    (
-		        SELECT SUM(json_extract(p2.data, '$.tokens.output'))
-		        FROM part p2
-		        WHERE p2.session_id = ?
-		          AND json_extract(p2.data, '$.type') = 'step-finish'
-		    ),
-		    (
-		        SELECT json_extract(p3.data, '$.tokens.total')
-		        FROM part p3
-		        WHERE p3.session_id = ?
-		          AND json_extract(p3.data, '$.type') = 'step-finish'
-		        ORDER BY p3.time_created DESC
-		        LIMIT 1
-		    )
+		    SUM(CASE WHEN json_extract(m.data,'$.role')='assistant'
+		             THEN json_extract(m.data,'$.tokens.input') END),
+		    SUM(CASE WHEN json_extract(m.data,'$.role')='assistant'
+		             THEN json_extract(m.data,'$.tokens.output') END),
+		    (SELECT json_extract(data,'$.tokens.total')
+		     FROM message
+		     WHERE session_id = ?
+		       AND json_extract(data,'$.role') = 'assistant'
+		     ORDER BY rowid DESC LIMIT 1)
 		FROM message m
 		WHERE m.session_id = ?
-	`, sessionID, sessionID, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens)
+	`, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens)
 	if err != nil {
 		return sessionStats{}, fmt.Errorf("query stats: %w", err)
 	}

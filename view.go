@@ -196,20 +196,14 @@ func (m model) renderList(width, height int) string {
 		visibleStart = m.cursor - height + 1
 	}
 
-	// Compute the path column width from the visible session set so the column
-	// stays as tight as possible and reflows correctly when the search filter
-	// changes.
+	// Compute the path column width from the cached value (pre-computed in
+	// Update whenever m.filtered changes — see model.recomputePathColW).
 	// Cap is tighter on narrower list panes (< wideLayoutBreakpoint cols).
 	maxPathW := maxPathWidthWide
 	if width < wideLayoutBreakpoint {
 		maxPathW = maxPathWidthNarrow
 	}
-	pathColW := 0
-	for _, s := range m.filtered {
-		if n := lipgloss.Width(s.ShortDirectory()); n > pathColW {
-			pathColW = n
-		}
-	}
+	pathColW := m.pathColW
 	if pathColW > maxPathW {
 		pathColW = maxPathW
 	}
@@ -353,8 +347,40 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		msgSection = "\n" + styleDim.Render("  no messages")
 
 	default:
-		blocks := make([]string, len(m.messages))
+		// Determine which messages are visible without rendering all of them.
+		// Walk backwards from the last message, accumulating line cost, until
+		// we exceed the available height. Only the visible subset is rendered.
+		costs := make([]int, len(m.messages))
 		for i, msg := range m.messages {
+			// Line count: 1 for the label + wrapped text lines + 1 blank separator.
+			// Approximate text lines as the number of "\n" in the raw text plus 1,
+			// then add any wrapping overflow using integer ceiling division.
+			rawLines := strings.Count(msg.Text, "\n") + 1
+			wrapExtra := 0
+			if inner > 0 {
+				for _, line := range strings.Split(msg.Text, "\n") {
+					visLen := lipgloss.Width(line)
+					if visLen > inner {
+						wrapExtra += (visLen - 1) / inner // extra wrap rows beyond the first
+					}
+				}
+			}
+			costs[i] = 1 + rawLines + wrapExtra + 1 // label line + text lines + blank sep
+		}
+
+		used := 0
+		first := len(m.messages)
+		for i := len(m.messages) - 1; i >= 0; i-- {
+			if used+costs[i] > msgHeight {
+				break
+			}
+			used += costs[i]
+			first = i
+		}
+
+		var sb strings.Builder
+		for i := first; i < len(m.messages); i++ {
+			msg := m.messages[i]
 			var label string
 			if msg.Role == "user" {
 				label = styleRoleUser.Render("[user]")
@@ -362,24 +388,8 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 				label = styleRoleAssistant.Render("[asst]")
 			}
 			wrapped := lipgloss.NewStyle().Width(inner).Render(msg.Text)
-			blocks[i] = label + "\n" + wrapped
-		}
-
-		used := 0
-		first := len(blocks)
-		for i := len(blocks) - 1; i >= 0; i-- {
-			cost := strings.Count(blocks[i], "\n") + 1 + 1 // +1: final line has no trailing \n; +1: blank separator line between blocks
-			if used+cost > msgHeight {
-				break
-			}
-			used += cost
-			first = i
-		}
-
-		var sb strings.Builder
-		for i := first; i < len(blocks); i++ {
 			sb.WriteString("\n")
-			sb.WriteString(blocks[i])
+			sb.WriteString(label + "\n" + wrapped)
 			sb.WriteString("\n")
 		}
 		msgSection = sb.String()
@@ -560,22 +570,31 @@ func formatSessionRow(s session, width, pathColW int, selected bool) string {
 	// reset. By giving every span its own background we guarantee the highlight
 	// is unbroken across the full row width regardless of what other attributes
 	// (bold, color) individual cells carry.
+	//
+	// Use pre-declared package-level style variants to avoid allocating mutated
+	// Style copies on every rendered row every frame.
 	base := styleRowBase
+	styledTitle := styleRowTitleBase
+	styledDate := styleRowDateBase
+	styledPath := styleRowPathBase
 	if selected {
 		base = styleRowSelected
+		styledTitle = styleRowTitleSelected
+		styledDate = styleRowDateSelected
+		styledPath = styleRowPathSelected
 	}
 
 	styledLead := base.Render(strings.Repeat(" ", leadSp))
-	styledTitle := base.Foreground(colorBright).Bold(true).Render(paddedTitle)
+	styledTitleStr := styledTitle.Render(paddedTitle)
 	styledTrail := base.Render(strings.Repeat(" ", trailSp) + trailFill)
 
 	row := styledLead
 	if showDate {
-		row += base.Foreground(colorDim).Render(date + strings.Repeat(" ", effectiveDateGap))
+		row += styledDate.Render(date + strings.Repeat(" ", effectiveDateGap))
 	}
-	row += styledTitle
+	row += styledTitleStr
 	if showPath {
-		row += base.Foreground(colorBlue).Render(strings.Repeat(" ", effectiveMinGap) + paddedPath)
+		row += styledPath.Render(strings.Repeat(" ", effectiveMinGap) + paddedPath)
 	}
 	row += styledTrail
 

@@ -176,4 +176,15 @@ var (
 	styleRowSelected     = lipgloss.NewStyle().Foreground(colorFg).Background(colorSelected)
 	styleWorkspaceRow    = lipgloss.NewStyle().Foreground(colorCyan).Background(colorBgPanel)
 	styleWorkspaceRowSel = lipgloss.NewStyle().Foreground(colorCyan).Background(colorSelected)
+
+	// Per-cell derived styles for formatSessionRow — pre-declared to avoid
+	// allocating mutated Style copies on every rendered row every frame.
+	// Each pair (base / selected) shares the same foreground/weight; only the
+	// background differs.
+	styleRowTitleBase     = styleRowBase.Foreground(colorBright).Bold(true)
+	styleRowTitleSelected = styleRowSelected.Foreground(colorBright).Bold(true)
+	styleRowDateBase      = styleRowBase.Foreground(colorDim)
+	styleRowDateSelected  = styleRowSelected.Foreground(colorDim)
+	styleRowPathBase      = styleRowBase.Foreground(colorBlue)
+	styleRowPathSelected  = styleRowSelected.Foreground(colorBlue)
 )

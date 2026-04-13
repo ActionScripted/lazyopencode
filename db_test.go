@@ -340,19 +340,15 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	path := createTestDB(t)
 
 	db := openRW(t, path)
+	// Token data lives in assistant message rows ($.tokens.*), not in the part table.
+	// The two assistant messages contribute: input 400+600=1000, output 100+250=350.
+	// ContextTokens comes from $.tokens.total of the last assistant message = 2000.
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
 		('msg-1', 'sess-1', '{"role":"user"}'),
-		('msg-2', 'sess-1', '{"role":"assistant"}')`)
+		('msg-2', 'sess-1', '{"role":"assistant","tokens":{"input":400,"output":100,"total":1000}}'),
+		('msg-3', 'sess-1', '{"role":"assistant","tokens":{"input":600,"output":250,"total":2000}}')`)
 	if err != nil {
 		t.Fatalf("insert messages: %v", err)
-	}
-	// Two step-finish parts: input 400+600, output 100+250; context tokens 1000 and 2000.
-	// The last one (time_created=2000) provides context_tokens=2000.
-	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
-		('p-1', 'msg-1', 'sess-1', '{"type":"step-finish","tokens":{"input":400,"output":100,"total":1000}}', 1000),
-		('p-2', 'msg-2', 'sess-1', '{"type":"step-finish","tokens":{"input":600,"output":250,"total":2000}}', 2000)`)
-	if err != nil {
-		t.Fatalf("insert parts: %v", err)
 	}
 	_ = db.Close()
 
@@ -360,8 +356,8 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if stats.MsgCount != 2 {
-		t.Errorf("MsgCount: got %d, want 2", stats.MsgCount)
+	if stats.MsgCount != 3 {
+		t.Errorf("MsgCount: got %d, want 3", stats.MsgCount)
 	}
 	if stats.InputTokens != 1000 {
 		t.Errorf("InputTokens: got %d, want 1000 (400+600)", stats.InputTokens)
@@ -370,7 +366,7 @@ func TestLoadStats_WithTokens(t *testing.T) {
 		t.Errorf("OutputTokens: got %d, want 350 (100+250)", stats.OutputTokens)
 	}
 	if stats.ContextTokens != 2000 {
-		t.Errorf("ContextTokens: got %d, want 2000 (last step-finish)", stats.ContextTokens)
+		t.Errorf("ContextTokens: got %d, want 2000 (last assistant message)", stats.ContextTokens)
 	}
 }
 
@@ -511,19 +507,13 @@ func TestLoadStats_ContextTokensFromLatestStepFinish(t *testing.T) {
 	path := createTestDB(t)
 
 	db := openRW(t, path)
+	// Token data lives in assistant message rows. The second message has the
+	// higher rowid and provides context_tokens=9999.
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
-		('msg-1', 'sess-1', '{"role":"assistant"}'),
-		('msg-2', 'sess-1', '{"role":"assistant"}')`)
+		('msg-1', 'sess-1', '{"role":"assistant","tokens":{"input":100,"output":50,"total":1000}}'),
+		('msg-2', 'sess-1', '{"role":"assistant","tokens":{"input":200,"output":75,"total":9999}}')`)
 	if err != nil {
 		t.Fatalf("insert messages: %v", err)
-	}
-	// Part 1: time_created=1000, total=1000; Part 2: time_created=2000, total=9999.
-	// ContextTokens must come from the later one (9999).
-	_, err = db.Exec(`INSERT INTO part (id, message_id, session_id, data, time_created) VALUES
-		('p-1', 'msg-1', 'sess-1', '{"type":"step-finish","tokens":{"input":100,"output":50,"total":1000}}', 1000),
-		('p-2', 'msg-2', 'sess-1', '{"type":"step-finish","tokens":{"input":200,"output":75,"total":9999}}', 2000)`)
-	if err != nil {
-		t.Fatalf("insert parts: %v", err)
 	}
 	_ = db.Close()
 
@@ -532,7 +522,7 @@ func TestLoadStats_ContextTokensFromLatestStepFinish(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if stats.ContextTokens != 9999 {
-		t.Errorf("ContextTokens: got %d, want 9999 (latest step-finish)", stats.ContextTokens)
+		t.Errorf("ContextTokens: got %d, want 9999 (latest assistant message)", stats.ContextTokens)
 	}
 	if stats.InputTokens != 300 {
 		t.Errorf("InputTokens: got %d, want 300 (100+200)", stats.InputTokens)

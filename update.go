@@ -41,6 +41,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Back):
 		m.search.SetValue("")
 		m.filtered = filterSessions(m.sessions, "")
+		m = m.recomputePathColW()
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 		m, cmd := m.loadMessagesForCursor()
 		return m, cmd
@@ -160,6 +161,7 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.search, cmd = m.search.Update(msg)
 	m.filtered = filterSessions(m.sessions, m.search.Value())
+	m = m.recomputePathColW()
 	m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
 	// If the selected session changed due to filtering, reload messages.
@@ -198,6 +200,7 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.sessions = removeSessionByID(m.sessions, id)
 			m.filtered = removeSessionByID(m.filtered, id)
 		}
+		m = m.recomputePathColW()
 		m.workspaces = buildWorkspaces(m.sessions, m.home)
 		m.workspaceCursor = clamp(m.workspaceCursor, 0, max(0, len(m.workspaces)-1))
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
@@ -228,6 +231,7 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Optimistic removal.
 		m.sessions = removeSessionByID(m.sessions, id)
 		m.filtered = removeSessionByID(m.filtered, id)
+		m = m.recomputePathColW()
 		m.workspaces = buildWorkspaces(m.sessions, m.home)
 		m.cursor = clamp(m.cursor, 0, max(0, len(m.filtered)-1))
 
