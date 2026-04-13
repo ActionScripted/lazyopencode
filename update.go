@@ -113,6 +113,11 @@ func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// cap the stored offset to prevent unbounded growth.
 		m.statsScrollOffset = clamp(m.statsScrollOffset+1, 0, m.height*4)
 		return m, nil
+
+	case key.Matches(msg, m.keys.Refresh):
+		// refresh the global stats dashboard
+		m.statsScrollOffset = 0
+		return m, m.loadGlobalStatsCmd()
 	}
 	return m, nil
 }

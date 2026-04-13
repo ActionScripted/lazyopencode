@@ -304,6 +304,10 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 			header.WriteString(metaLabel("tokens"))
 			fmt.Fprintf(&header, "%s in / %s out", formatTokens(st.InputTokens), formatTokens(st.OutputTokens))
 			header.WriteString("\n")
+
+			header.WriteString(metaLabel("cost"))
+			header.WriteString(formatCost(st.Cost))
+			header.WriteString("\n")
 		}
 	}
 
@@ -493,7 +497,7 @@ func (m model) renderHint(width int) string {
 		case modeGoto:
 			hints = "  s: shell   w: workspace   esc: cancel"
 		case modeStats:
-			hints = "  j/k: scroll   esc: back"
+			hints = "  j/k: scroll   r: refresh   esc: back"
 		case modeError:
 			hints = "  q: quit"
 		default:

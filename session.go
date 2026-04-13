@@ -32,6 +32,7 @@ type sessionStats struct {
 	OutputTokens  int      // sum of tokens.output across all step-finish parts
 	ContextTokens int      // tokens.total from the last step-finish part (0 if none)
 	Models        []string // distinct model IDs used in the session, ordered by first use
+	Cost          float64  // sum of $.cost from all assistant messages in the session
 }
 
 // modelStat holds aggregate usage for a single AI model.

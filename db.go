@@ -180,10 +180,12 @@ func loadStats(dbPath, sessionID string) (sessionStats, error) {
 		     FROM message
 		     WHERE session_id = ?
 		       AND json_extract(data,'$.role') = 'assistant'
-		     ORDER BY rowid DESC LIMIT 1)
+		     ORDER BY rowid DESC LIMIT 1),
+		    COALESCE(SUM(CASE WHEN json_extract(m.data,'$.role')='assistant'
+		             THEN json_extract(m.data,'$.cost') END), 0)
 		FROM message m
 		WHERE m.session_id = ?
-	`, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens)
+	`, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens, &stats.Cost)
 	if err != nil {
 		return sessionStats{}, fmt.Errorf("query stats: %w", err)
 	}

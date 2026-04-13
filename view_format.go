@@ -106,8 +106,24 @@ func renderHintSegments(hints string) string {
 	var sb strings.Builder
 	for i, seg := range segments {
 		if i == 0 {
-			// Leading padding / empty prefix — always dim.
-			sb.WriteString(styleDim.Render(seg))
+			// First segment may contain leading padding followed by a key:desc
+			// pair (e.g. "  j/k: up/down"). Preserve leading spaces as dim
+			// then style the key separately if a colon is present.
+			// If there's no colon, render the whole segment dim as before.
+			// Find leading space count.
+			firstNonSpace := 0
+			for firstNonSpace < len(seg) && seg[firstNonSpace] == ' ' {
+				firstNonSpace++
+			}
+			prefix := seg[:firstNonSpace]
+			rest := seg[firstNonSpace:]
+			sb.WriteString(styleDim.Render(prefix))
+			if idx := strings.Index(rest, ": "); idx != -1 {
+				sb.WriteString(styleHintKey.Render(rest[:idx]))
+				sb.WriteString(styleDim.Render(": " + rest[idx+2:]))
+			} else {
+				sb.WriteString(styleDim.Render(rest))
+			}
 			continue
 		}
 		sb.WriteString(styleDim.Render("   "))

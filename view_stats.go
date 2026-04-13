@@ -112,7 +112,7 @@ func (m model) renderStats(w, h int) string {
 			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
 			cost:   gs.TotalCost,
 			innerW: innerW,
-		})
+		}, compact)
 		recentKV := buildSummaryKV(summaryData{
 			sessions: gs.RecentSessions, prompts: gs.RecentPrompts,
 			input: gs.RecentInput, output: gs.RecentOutput,
@@ -121,7 +121,7 @@ func (m model) renderStats(w, h int) string {
 			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
 			cost:   gs.RecentCost,
 			innerW: innerW,
-		})
+		}, compact)
 
 		for _, line := range strings.Split(renderFieldset("ALL TIME", allTimeKV, outerW, innerW), "\n") {
 			sb.WriteString(pad + line + "\n")
@@ -151,7 +151,7 @@ func (m model) renderStats(w, h int) string {
 			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
 			cost:   gs.TotalCost,
 			innerW: innerW,
-		})
+		}, compact)
 		recentKV := buildSummaryKV(summaryData{
 			sessions: gs.RecentSessions, prompts: gs.RecentPrompts,
 			input: gs.RecentInput, output: gs.RecentOutput,
@@ -160,7 +160,7 @@ func (m model) renderStats(w, h int) string {
 			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
 			cost:   gs.RecentCost,
 			innerW: innerW,
-		})
+		}, compact)
 
 		left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW)
 		right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW)
@@ -329,7 +329,7 @@ type summaryData struct {
 	innerW                      int
 }
 
-func buildSummaryKV(d summaryData) string {
+func buildSummaryKV(d summaryData, compact bool) string {
 	const labelW = 14
 
 	// kv builds "dim-label<spaces>value" right-aligning value to fill innerW.
@@ -369,19 +369,31 @@ func buildSummaryKV(d summaryData) string {
 		kv("sessions", styleStatsCountPanel.Render(formatCommas(d.sessions))),
 		kv("prompts", styleStatsCountPanel.Render(formatCommas(d.prompts))),
 		blank,
-		kv("tokens in", formatTokens(d.input)),
-		kv("tokens out", formatTokens(d.output)),
-		kv("cache read", formatTokens(d.cacheRead)),
-		kv("cache write", formatTokens(d.cacheWrite)),
+	}
+
+	if compact {
+		rows = append(rows,
+			kv("tokens in/out", formatTokens(d.input)+" / "+formatTokens(d.output)),
+			kv("cache r/w", formatTokens(d.cacheRead)+" / "+formatTokens(d.cacheWrite)),
+		)
+	} else {
+		rows = append(rows,
+			kv("tokens in", formatTokens(d.input)),
+			kv("tokens out", formatTokens(d.output)),
+			kv("cache read", formatTokens(d.cacheRead)),
+			kv("cache write", formatTokens(d.cacheWrite)),
+		)
+	}
+
+	rows = append(rows,
 		blank,
 		kv("total time", formatDurationMS(d.durationMS)),
 		kv("avg time", perSession),
-		blank,
 		kv("cost", formatCost(d.cost)),
 		blank,
 		kv("files", formatCommas(d.files)),
 		kv("changes", changes),
-	}
+	)
 	return strings.Join(rows, "\n")
 }
 
@@ -504,7 +516,7 @@ func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) 
 		sb.WriteString(pad)
 		sb.WriteString(label.Render(padRight(name, nameW)))
 		renderTableCols(&sb, r, g, compact, sp, count)
-		sb.WriteString(sp.Render(" "))
+		sb.WriteString(sp.Render(strings.Repeat(" ", 1+tblNameIndent)))
 		sb.WriteString("\n")
 	}
 	return sb.String()
@@ -528,7 +540,7 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool
 		sb.WriteString(pad)
 		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
 		renderTableCols(&sb, r, g, compact, styleSpPanel, styleStatsCountPanel)
-		sb.WriteString(styleSpPanel.Render(" "))
+		sb.WriteString(styleSpPanel.Render(strings.Repeat(" ", 1+tblNameIndent)))
 		sb.WriteString("\n")
 
 		// Per-model sub-rows: alt background, extra indent.
@@ -537,7 +549,7 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool
 			sb.WriteString(pad)
 			sb.WriteString(styleDimPanelAlt.Render(padRight(subName, nameW)))
 			renderTableCols(&sb, sr, g, compact, styleDimPanelAlt, styleDimPanelAlt)
-			sb.WriteString(styleSpPanelAlt.Render(" "))
+			sb.WriteString(styleSpPanelAlt.Render(strings.Repeat(" ", 1+tblNameIndent)))
 			sb.WriteString("\n")
 		}
 	}

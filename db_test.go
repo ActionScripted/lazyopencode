@@ -343,10 +343,11 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	// Token data lives in assistant message rows ($.tokens.*), not in the part table.
 	// The two assistant messages contribute: input 400+600=1000, output 100+250=350.
 	// ContextTokens comes from $.tokens.total of the last assistant message = 2000.
+	// Add cost fields for both assistant messages: 0.02 and 0.03, making total cost 0.05.
 	_, err := db.Exec(`INSERT INTO message (id, session_id, data) VALUES
 		('msg-1', 'sess-1', '{"role":"user"}'),
-		('msg-2', 'sess-1', '{"role":"assistant","tokens":{"input":400,"output":100,"total":1000}}'),
-		('msg-3', 'sess-1', '{"role":"assistant","tokens":{"input":600,"output":250,"total":2000}}')`)
+		('msg-2', 'sess-1', '{"role":"assistant","tokens":{"input":400,"output":100,"total":1000},"cost":0.02}'),
+		('msg-3', 'sess-1', '{"role":"assistant","tokens":{"input":600,"output":250,"total":2000},"cost":0.03}')`)
 	if err != nil {
 		t.Fatalf("insert messages: %v", err)
 	}
@@ -367,6 +368,9 @@ func TestLoadStats_WithTokens(t *testing.T) {
 	}
 	if stats.ContextTokens != 2000 {
 		t.Errorf("ContextTokens: got %d, want 2000 (last assistant message)", stats.ContextTokens)
+	}
+	if stats.Cost != 0.05 {
+		t.Errorf("Cost: got %v, want 0.05", stats.Cost)
 	}
 }
 
