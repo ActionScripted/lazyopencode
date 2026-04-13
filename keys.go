@@ -6,49 +6,49 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 )
 
-// Mode represents the current input mode.
-type Mode int
+// mode represents the current input mode.
+type mode int
 
 const (
-	ModeNormal Mode = iota
-	ModeSearch
-	ModeWorkspaces
-	ModeConfirmDelete
-	ModeConfirmDeleteWorkspace
-	ModeYank
-	ModeGoto
-	ModeStats
-	ModeError
+	modeNormal mode = iota
+	modeSearch
+	modeWorkspaces
+	modeConfirmDelete
+	modeConfirmDeleteWorkspace
+	modeYank
+	modeGoto
+	modeStats
+	modeError
 )
 
 // String returns a human-readable name for the mode, used in logs and errors.
-func (m Mode) String() string {
+func (m mode) String() string {
 	switch m {
-	case ModeNormal:
+	case modeNormal:
 		return "Normal"
-	case ModeSearch:
+	case modeSearch:
 		return "Search"
-	case ModeWorkspaces:
+	case modeWorkspaces:
 		return "Workspaces"
-	case ModeConfirmDelete:
+	case modeConfirmDelete:
 		return "ConfirmDelete"
-	case ModeConfirmDeleteWorkspace:
+	case modeConfirmDeleteWorkspace:
 		return "ConfirmDeleteWorkspace"
-	case ModeYank:
+	case modeYank:
 		return "Yank"
-	case ModeGoto:
+	case modeGoto:
 		return "Goto"
-	case ModeStats:
+	case modeStats:
 		return "Stats"
-	case ModeError:
+	case modeError:
 		return "Error"
 	default:
-		return fmt.Sprintf("Mode(%d)", m)
+		return fmt.Sprintf("mode(%d)", m)
 	}
 }
 
-// KeyMap holds all named key bindings for the application.
-type KeyMap struct {
+// keyMap holds all named key bindings for the application.
+type keyMap struct {
 	Up            key.Binding
 	Down          key.Binding
 	Search        key.Binding
@@ -68,9 +68,9 @@ type KeyMap struct {
 	Stats         key.Binding
 }
 
-// DefaultKeyMap returns the default key bindings.
-func DefaultKeyMap() KeyMap {
-	return KeyMap{
+// defaultKeyMap returns the default key bindings.
+func defaultKeyMap() keyMap {
+	return keyMap{
 		Up: key.NewBinding(
 			key.WithKeys("k", "up"),
 			key.WithHelp("k/↑", "up"),

@@ -14,19 +14,19 @@ import (
 
 // sessionsLoadedMsg carries sessions fetched from the DB.
 type sessionsLoadedMsg struct {
-	sessions []Session
+	sessions []session
 }
 
 // messagesLoadedMsg carries messages for a specific session.
 type messagesLoadedMsg struct {
 	sessionID string
-	messages  []Message
+	messages  []message
 }
 
 // statsLoadedMsg carries aggregated stats for a specific session.
 type statsLoadedMsg struct {
 	sessionID string
-	stats     SessionStats
+	stats     sessionStats
 }
 
 // sessionDeletedMsg signals that a session was successfully deleted.
@@ -47,7 +47,7 @@ type shellExitedMsg struct{}
 // yankDoneMsg signals that the yank command completed (success or silent failure).
 type yankDoneMsg struct{}
 
-// dbErrMsg carries a fatal database error that transitions the app to ModeError.
+// dbErrMsg carries a fatal database error that transitions the app to modeError.
 type dbErrMsg struct {
 	err error
 }
@@ -60,7 +60,7 @@ type opErrMsg struct {
 
 // globalStatsLoadedMsg carries aggregate stats for the stats dashboard.
 type globalStatsLoadedMsg struct {
-	stats GlobalStats
+	stats globalStats
 }
 
 // resolveHome returns the current user's home directory, or "" on failure.
@@ -73,10 +73,10 @@ func resolveHome() string {
 }
 
 type model struct {
-	mode                   Mode
-	keys                   KeyMap
-	sessions               []Session
-	filtered               []Session
+	mode                   mode
+	keys                   keyMap
+	sessions               []session
+	filtered               []session
 	cursor                 int
 	search                 textinput.Model
 	width                  int
@@ -86,14 +86,14 @@ type model struct {
 	demoMode               bool
 	err                    error
 	notice                 string        // transient operation error; cleared on next keypress
-	messages               []Message     // messages for currently selected session; nil = loading
-	stats                  *SessionStats // stats for currently selected session; nil = loading
+	messages               []message     // messages for currently selected session; nil = loading
+	stats                  *sessionStats // stats for currently selected session; nil = loading
 	previewSessionID       string        // session ID whose messages are loaded
 	workspaces             []workspace   // sorted unique workspace directories
 	workspaceCursor        int           // cursor into workspaces slice
 	pendingDeleteID        string        // session ID awaiting delete confirmation
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
-	globalStats            *GlobalStats  // cached aggregate stats; nil until first load
+	globalStats            *globalStats  // cached aggregate stats; nil until first load
 	statsScrollOffset      int           // scroll position (in lines) for the stats view
 }
 
@@ -103,8 +103,8 @@ func newModel(dbPath string, demoMode bool) model {
 	ti.Prompt = ""
 
 	return model{
-		mode:     ModeNormal,
-		keys:     DefaultKeyMap(),
+		mode:     modeNormal,
+		keys:     defaultKeyMap(),
 		dbPath:   dbPath,
 		home:     resolveHome(),
 		demoMode: demoMode,
@@ -139,7 +139,7 @@ func (m model) loadMessagesCmd(sessionID string) tea.Cmd {
 		messages, err := loadMessages(m.dbPath, sessionID)
 		if err != nil {
 			// Non-fatal: just return empty rather than crashing the preview.
-			return messagesLoadedMsg{sessionID: sessionID, messages: []Message{}}
+			return messagesLoadedMsg{sessionID: sessionID, messages: []message{}}
 		}
 		return messagesLoadedMsg{sessionID: sessionID, messages: messages}
 	}
@@ -155,7 +155,7 @@ func (m model) loadStatsCmd(sessionID string) tea.Cmd {
 		stats, err := loadStats(m.dbPath, sessionID)
 		if err != nil {
 			// Non-fatal: show zero stats rather than an error.
-			return statsLoadedMsg{sessionID: sessionID, stats: SessionStats{}}
+			return statsLoadedMsg{sessionID: sessionID, stats: sessionStats{}}
 		}
 		return statsLoadedMsg{sessionID: sessionID, stats: stats}
 	}
@@ -365,7 +365,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dbErrMsg:
 		m.err = msg.err
-		m.mode = ModeError
+		m.mode = modeError
 		return m, nil
 
 	case opErrMsg:
@@ -380,23 +380,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.notice = "" // clear any transient notice on the next keypress
 		switch m.mode {
-		case ModeNormal:
+		case modeNormal:
 			return m.updateNormal(msg)
-		case ModeSearch:
+		case modeSearch:
 			return m.updateSearch(msg)
-		case ModeWorkspaces:
+		case modeWorkspaces:
 			return m.updateWorkspaces(msg)
-		case ModeConfirmDelete:
+		case modeConfirmDelete:
 			return m.updateConfirmDelete(msg)
-		case ModeConfirmDeleteWorkspace:
+		case modeConfirmDeleteWorkspace:
 			return m.updateConfirmDeleteWorkspace(msg)
-		case ModeYank:
+		case modeYank:
 			return m.updateYank(msg)
-		case ModeGoto:
+		case modeGoto:
 			return m.updateGoto(msg)
-		case ModeStats:
+		case modeStats:
 			return m.updateStats(msg)
-		case ModeError:
+		case modeError:
 			return m.updateError(msg)
 		}
 	}

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Session represents a single opencode session.
-type Session struct {
+// session represents a single opencode session.
+type session struct {
 	ID         string
 	Title      string
 	Directory  string
@@ -23,9 +23,9 @@ type Session struct {
 	SummaryDeletions int
 }
 
-// SessionStats holds per-session aggregates fetched asynchronously from the
+// sessionStats holds per-session aggregates fetched asynchronously from the
 // part table. Loaded in parallel with messages whenever the cursor moves.
-type SessionStats struct {
+type sessionStats struct {
 	MsgCount      int
 	InputTokens   int      // sum of tokens.input across all step-finish parts
 	OutputTokens  int      // sum of tokens.output across all step-finish parts
@@ -33,8 +33,8 @@ type SessionStats struct {
 	Models        []string // distinct model IDs used in the session, ordered by first use
 }
 
-// ModelStat holds aggregate usage for a single AI model.
-type ModelStat struct {
+// modelStat holds aggregate usage for a single AI model.
+type modelStat struct {
 	Name         string
 	Sessions     int
 	Turns        int // count of step-finish parts attributed to this model
@@ -43,8 +43,8 @@ type ModelStat struct {
 	DurationMS   int64 // sum of (time_updated - time_created) for sessions using this model
 }
 
-// ProjectStat holds aggregate stats for a project directory.
-type ProjectStat struct {
+// projectStat holds aggregate stats for a project directory.
+type projectStat struct {
 	Dir          string
 	DisplayDir   string
 	Sessions     int
@@ -52,11 +52,11 @@ type ProjectStat struct {
 	InputTokens  int
 	OutputTokens int
 	DurationMS   int64
-	Models       []ModelStat // per-model breakdown within this project, ordered by session count desc
+	Models       []modelStat // per-model breakdown within this project, ordered by session count desc
 }
 
-// GlobalStats holds aggregate stats across all sessions, used by the stats dashboard.
-type GlobalStats struct {
+// globalStats holds aggregate stats across all sessions, used by the stats dashboard.
+type globalStats struct {
 	// All-time totals
 	TotalSessions   int
 	TotalMessages   int
@@ -80,20 +80,19 @@ type GlobalStats struct {
 	RecentDeletions  int
 	RecentDurationMS int64
 	// Breakdowns
-	Models       []ModelStat   // all-time, ordered by session count desc
-	RecentModels []ModelStat   // last 7 days, ordered by session count desc
-	Projects     []ProjectStat // top 10, ordered by session count desc
+	Models   []modelStat   // all-time, ordered by session count desc
+	Projects []projectStat // top 10, ordered by session count desc
 }
 
-// Message represents a single chat message in a session.
-type Message struct {
+// message represents a single chat message in a session.
+type message struct {
 	Role string // "user" or "assistant"
 	Text string
 }
 
 // FilterValue returns the string used for search matching.
 // Implements the bubbles/list.Item interface for future compatibility.
-func (s Session) FilterValue() string {
+func (s session) FilterValue() string {
 	return s.Title + " " + s.Directory
 }
 
@@ -105,25 +104,32 @@ type workspace struct {
 }
 
 // DisplayDirectory returns the pre-computed display path (home replaced by "~").
-func (s Session) DisplayDirectory() string {
+func (s session) DisplayDirectory() string {
 	return s.DisplayDir
 }
 
 // ShortDirectory returns the pre-computed short path (last component, or "~").
-func (s Session) ShortDirectory() string {
+func (s session) ShortDirectory() string {
 	return s.ShortDir
 }
 
 // homeToTilde replaces the home directory prefix with "~" in the given path.
 // home must be the result of os.UserHomeDir, resolved once by the caller.
-// Called once at load time to populate Session.DisplayDir.
+// Called once at load time to populate session.DisplayDir.
 func homeToTilde(dir, home string) string {
-	return strings.Replace(dir, home, "~", 1)
+	if home == "" {
+		return dir
+	}
+	trimmed := strings.TrimPrefix(dir, home)
+	if trimmed == dir {
+		return dir // home was not a prefix
+	}
+	return "~" + trimmed
 }
 
 // baseName returns just the last path component of dir, or "~" if dir equals
 // home. home must be the result of os.UserHomeDir, resolved once by the caller.
-// Called once at load time to populate Session.ShortDir.
+// Called once at load time to populate session.ShortDir.
 func baseName(dir, home string) string {
 	if dir == home {
 		return "~"
@@ -135,12 +141,12 @@ func baseName(dir, home string) string {
 // against each session's FilterValue (title + directory).
 // Always returns an independent slice — callers may safely append to or modify
 // the result without aliasing m.sessions.
-func filterSessions(sessions []Session, query string) []Session {
+func filterSessions(sessions []session, query string) []session {
 	if query == "" {
-		return append([]Session(nil), sessions...)
+		return append([]session(nil), sessions...)
 	}
 	q := strings.ToLower(query)
-	out := make([]Session, 0, len(sessions))
+	out := make([]session, 0, len(sessions))
 	for _, s := range sessions {
 		if strings.Contains(strings.ToLower(s.FilterValue()), q) {
 			out = append(out, s)
@@ -153,7 +159,7 @@ func filterSessions(sessions []Session, query string) []Session {
 // the given sessions. home must be the result of os.UserHomeDir, resolved once
 // by the caller. DisplayDir is pre-computed once here to avoid calling
 // os.UserHomeDir on every render frame.
-func buildWorkspaces(sessions []Session, home string) []workspace {
+func buildWorkspaces(sessions []session, home string) []workspace {
 	seen := make(map[string]struct{}, len(sessions))
 	for _, s := range sessions {
 		seen[s.Directory] = struct{}{}
@@ -167,8 +173,8 @@ func buildWorkspaces(sessions []Session, home string) []workspace {
 }
 
 // removeSessionByID returns a new slice with the session matching id removed.
-func removeSessionByID(sessions []Session, id string) []Session {
-	out := make([]Session, 0, len(sessions))
+func removeSessionByID(sessions []session, id string) []session {
+	out := make([]session, 0, len(sessions))
 	for _, s := range sessions {
 		if s.ID != id {
 			out = append(out, s)

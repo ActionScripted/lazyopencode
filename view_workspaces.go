@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderWorkspacesView is the top-level renderer for ModeWorkspaces. It
+// renderWorkspacesView is the top-level renderer for modeWorkspaces. It
 // composes a top bar, a side-by-side left/right pane body, and the hint bar.
 func (m model) renderWorkspacesView(w, h int) string {
 	hint := m.renderHint(w)
@@ -98,7 +98,7 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 	selectedWS := m.workspaces[m.workspaceCursor]
 
 	// Filter sessions belonging to the selected workspace.
-	var wsSessions []Session
+	var wsSessions []session
 	for _, s := range m.sessions {
 		if s.Directory == selectedWS.Dir {
 			wsSessions = append(wsSessions, s)
@@ -146,7 +146,7 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 // formatWorkspaceSessionRow renders a compact session row for the workspaces
 // right pane. Layout: date(dateFullWidth) "  " title(remaining). No path
 // column needed since all sessions share the same workspace directory.
-func formatWorkspaceSessionRow(s Session, width int) string {
+func formatWorkspaceSessionRow(s session, width int) string {
 	titleW := width - dateFullWidth - dateGap
 	if titleW < 1 {
 		titleW = 1

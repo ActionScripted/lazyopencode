@@ -39,13 +39,13 @@ func openReadOnlyDB(path string) (*sql.DB, bool, error) {
 // Returns an empty slice (not an error) if the database file does not exist.
 // home is the user's home directory (used for display path substitution) and
 // is passed explicitly so the function does not call os.UserHomeDir itself.
-func loadSessions(dbPath, home string) ([]Session, error) {
+func loadSessions(dbPath, home string) ([]session, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	if missing {
-		return []Session{}, nil
+		return []session{}, nil
 	}
 	defer func() { _ = db.Close() }()
 	rows, err := db.Query(`
@@ -63,9 +63,9 @@ func loadSessions(dbPath, home string) ([]Session, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var sessions []Session
+	var sessions []session
 	for rows.Next() {
-		var s Session
+		var s session
 		var createdMS, updatedMS int64
 		if err := rows.Scan(
 			&s.ID, &s.Title, &s.Directory,
@@ -89,13 +89,13 @@ func loadSessions(dbPath, home string) ([]Session, error) {
 
 // loadMessages returns all text messages for a session, ordered by time.
 // One entry per message (first non-empty text part).
-func loadMessages(dbPath, sessionID string) ([]Message, error) {
+func loadMessages(dbPath, sessionID string) ([]message, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	if missing {
-		return []Message{}, nil
+		return []message{}, nil
 	}
 	defer func() { _ = db.Close() }()
 
@@ -120,9 +120,9 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var messages []Message
+	var messages []message
 	for rows.Next() {
-		var msg Message
+		var msg message
 		if err := rows.Scan(&msg.Role, &msg.Text); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
@@ -140,19 +140,19 @@ func loadMessages(dbPath, sessionID string) ([]Message, error) {
 //   - output_tokens: sum of tokens.output across all step-finish parts
 //   - context_tokens: tokens.total from the most recent step-finish part
 //
-// Returns a zero-value SessionStats (not an error) if no step-finish parts
+// Returns a zero-value sessionStats (not an error) if no step-finish parts
 // exist (pure chat sessions with no model calls).
-func loadStats(dbPath, sessionID string) (SessionStats, error) {
+func loadStats(dbPath, sessionID string) (sessionStats, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		return SessionStats{}, err
+		return sessionStats{}, err
 	}
 	if missing {
-		return SessionStats{}, nil
+		return sessionStats{}, nil
 	}
 	defer func() { _ = db.Close() }()
 
-	var stats SessionStats
+	var stats sessionStats
 	var inputTokens, outputTokens, contextTokens *int // nullable — NULL when no step-finish parts
 
 	err = db.QueryRow(`
@@ -182,7 +182,7 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 		WHERE m.session_id = ?
 	`, sessionID, sessionID, sessionID, sessionID).Scan(&stats.MsgCount, &inputTokens, &outputTokens, &contextTokens)
 	if err != nil {
-		return SessionStats{}, fmt.Errorf("query stats: %w", err)
+		return sessionStats{}, fmt.Errorf("query stats: %w", err)
 	}
 
 	if inputTokens != nil {
@@ -213,18 +213,18 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 		ORDER BY MIN(rowid)
 	`, sessionID)
 	if err != nil {
-		return SessionStats{}, fmt.Errorf("query models: %w", err)
+		return sessionStats{}, fmt.Errorf("query models: %w", err)
 	}
 	defer func() { _ = modelRows.Close() }()
 	for modelRows.Next() {
 		var name string
 		if err := modelRows.Scan(&name); err != nil {
-			return SessionStats{}, fmt.Errorf("scan model: %w", err)
+			return sessionStats{}, fmt.Errorf("scan model: %w", err)
 		}
 		stats.Models = append(stats.Models, name)
 	}
 	if err := modelRows.Err(); err != nil {
-		return SessionStats{}, fmt.Errorf("iterate models: %w", err)
+		return sessionStats{}, fmt.Errorf("iterate models: %w", err)
 	}
 
 	return stats, nil
@@ -232,23 +232,23 @@ func loadStats(dbPath, sessionID string) (SessionStats, error) {
 
 // loadGlobalStats returns aggregate statistics across all primary sessions
 // (parent_id IS NULL). Two windows are returned: all-time and last 7 days.
-// Non-fatal: returns a zero-value GlobalStats on any query error rather than
+// Non-fatal: returns a zero-value globalStats on any query error rather than
 // surfacing DB errors to the stats view.
 // home is the user's home directory (used for display path substitution) and
 // is passed explicitly so the function does not call os.UserHomeDir itself.
-func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
+func loadGlobalStats(dbPath, home string) (globalStats, error) {
 	db, missing, err := openReadOnlyDB(dbPath)
 	if err != nil {
-		return GlobalStats{}, err
+		return globalStats{}, err
 	}
 	if missing {
-		return GlobalStats{}, nil
+		return globalStats{}, nil
 	}
 	defer func() { _ = db.Close() }()
 
 	sevenDaysAgoMS := (time.Now().UnixMilli()) - (7 * 24 * 60 * 60 * 1000)
 
-	var gs GlobalStats
+	var gs globalStats
 
 	// ── All-time session totals (session table only) ──────────────────────────
 	if err := db.QueryRow(`
@@ -259,7 +259,7 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		       COALESCE(SUM(time_updated - time_created),0)
 		FROM session WHERE parent_id IS NULL
 	`).Scan(&gs.TotalSessions, &gs.TotalFiles, &gs.TotalAdditions, &gs.TotalDeletions, &gs.TotalDurationMS); err != nil {
-		return GlobalStats{}, fmt.Errorf("query total sessions: %w", err)
+		return globalStats{}, fmt.Errorf("query total sessions: %w", err)
 	}
 
 	// ── All-time token + message totals (part step-finish) ───────────────────
@@ -274,7 +274,7 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		WHERE json_extract(p.data,'$.type') = 'step-finish'
 		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
 	`).Scan(&gs.TotalMessages, &totalInput, &totalOutput, &totalCacheRead, &totalCacheWrite); err != nil {
-		return GlobalStats{}, fmt.Errorf("query total tokens: %w", err)
+		return globalStats{}, fmt.Errorf("query total tokens: %w", err)
 	}
 	if totalInput != nil {
 		gs.TotalInput = *totalInput
@@ -298,7 +298,7 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		       COALESCE(SUM(time_updated - time_created),0)
 		FROM session WHERE parent_id IS NULL AND time_created > ?
 	`, sevenDaysAgoMS).Scan(&gs.RecentSessions, &gs.RecentFiles, &gs.RecentAdditions, &gs.RecentDeletions, &gs.RecentDurationMS); err != nil {
-		return GlobalStats{}, fmt.Errorf("query recent sessions: %w", err)
+		return globalStats{}, fmt.Errorf("query recent sessions: %w", err)
 	}
 
 	var recentInput, recentOutput, recentCacheRead, recentCacheWrite *int
@@ -312,7 +312,7 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		WHERE json_extract(p.data,'$.type') = 'step-finish'
 		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
 	`, sevenDaysAgoMS).Scan(&gs.RecentMessages, &recentInput, &recentOutput, &recentCacheRead, &recentCacheWrite); err != nil {
-		return GlobalStats{}, fmt.Errorf("query recent tokens: %w", err)
+		return globalStats{}, fmt.Errorf("query recent tokens: %w", err)
 	}
 	if recentInput != nil {
 		gs.RecentInput = *recentInput
@@ -363,18 +363,18 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		ORDER BY 2 DESC
 	`)
 	if err != nil {
-		return GlobalStats{}, fmt.Errorf("query models: %w", err)
+		return globalStats{}, fmt.Errorf("query models: %w", err)
 	}
 	defer func() { _ = modelRows.Close() }()
 	for modelRows.Next() {
-		var ms ModelStat
+		var ms modelStat
 		if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
-			return GlobalStats{}, fmt.Errorf("scan model stat: %w", err)
+			return globalStats{}, fmt.Errorf("scan model stat: %w", err)
 		}
 		gs.Models = append(gs.Models, ms)
 	}
 	if err := modelRows.Err(); err != nil {
-		return GlobalStats{}, fmt.Errorf("iterate models: %w", err)
+		return globalStats{}, fmt.Errorf("iterate models: %w", err)
 	}
 
 	// ── Project breakdown (top 10 by session count) ───────────────────────────
@@ -394,19 +394,19 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 		LIMIT 10
 	`)
 	if err != nil {
-		return GlobalStats{}, fmt.Errorf("query projects: %w", err)
+		return globalStats{}, fmt.Errorf("query projects: %w", err)
 	}
 	defer func() { _ = projRows.Close() }()
 	for projRows.Next() {
-		var ps ProjectStat
+		var ps projectStat
 		if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Turns, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
-			return GlobalStats{}, fmt.Errorf("scan project stat: %w", err)
+			return globalStats{}, fmt.Errorf("scan project stat: %w", err)
 		}
 		ps.DisplayDir = homeToTilde(ps.Dir, home)
 		gs.Projects = append(gs.Projects, ps)
 	}
 	if err := projRows.Err(); err != nil {
-		return GlobalStats{}, fmt.Errorf("iterate projects: %w", err)
+		return globalStats{}, fmt.Errorf("iterate projects: %w", err)
 	}
 
 	// ── Per-project model breakdown ───────────────────────────────────────────
@@ -454,77 +454,26 @@ func loadGlobalStats(dbPath, home string) (GlobalStats, error) {
 			ORDER BY s.directory, 3 DESC
 		`)
 		if err != nil {
-			return GlobalStats{}, fmt.Errorf("query project models: %w", err)
+			return globalStats{}, fmt.Errorf("query project models: %w", err)
 		}
 		defer func() { _ = projModelRows.Close() }()
 
-		// Build map[dir][]ModelStat then attach to each ProjectStat.
-		projModels := make(map[string][]ModelStat, len(gs.Projects))
+		// Build map[dir][]modelStat then attach to each projectStat.
+		projModels := make(map[string][]modelStat, len(gs.Projects))
 		for projModelRows.Next() {
 			var dir string
-			var ms ModelStat
+			var ms modelStat
 			if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
-				return GlobalStats{}, fmt.Errorf("scan project model stat: %w", err)
+				return globalStats{}, fmt.Errorf("scan project model stat: %w", err)
 			}
 			projModels[dir] = append(projModels[dir], ms)
 		}
 		if err := projModelRows.Err(); err != nil {
-			return GlobalStats{}, fmt.Errorf("iterate project models: %w", err)
+			return globalStats{}, fmt.Errorf("iterate project models: %w", err)
 		}
 		for i, ps := range gs.Projects {
 			gs.Projects[i].Models = projModels[ps.Dir]
 		}
-	}
-
-	// ── Recent model breakdown (last 7 days) ──────────────────────────────────
-	recentModelRows, err := db.Query(`
-		SELECT COALESCE(
-		           json_extract(m.data,'$.modelID'),
-		           json_extract(m.data,'$.model.modelID'),
-		           'unknown'
-		       ) AS model_name,
-		       COUNT(DISTINCT m.session_id),
-		       COUNT(p.id),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
-		       COALESCE((
-		           SELECT SUM(s.time_updated - s.time_created)
-		           FROM session s
-		           WHERE s.parent_id IS NULL
-		             AND s.time_created > ?
-		             AND s.id IN (
-		                 SELECT DISTINCT m2.session_id
-		                 FROM message m2
-		                 WHERE json_extract(m2.data,'$.role') = 'assistant'
-		                   AND COALESCE(
-		                           json_extract(m2.data,'$.modelID'),
-		                           json_extract(m2.data,'$.model.modelID'),
-		                           'unknown'
-		                       ) = model_name
-		                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
-		             )
-		       ), 0)
-		FROM message m
-		JOIN part p ON p.session_id = m.session_id
-		          AND json_extract(p.data,'$.type') = 'step-finish'
-		WHERE json_extract(m.data,'$.role') = 'assistant'
-		  AND m.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
-		GROUP BY 1
-		ORDER BY 2 DESC
-	`, sevenDaysAgoMS, sevenDaysAgoMS, sevenDaysAgoMS)
-	if err != nil {
-		return GlobalStats{}, fmt.Errorf("query recent models: %w", err)
-	}
-	defer func() { _ = recentModelRows.Close() }()
-	for recentModelRows.Next() {
-		var ms ModelStat
-		if err := recentModelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
-			return GlobalStats{}, fmt.Errorf("scan recent model stat: %w", err)
-		}
-		gs.RecentModels = append(gs.RecentModels, ms)
-	}
-	if err := recentModelRows.Err(); err != nil {
-		return GlobalStats{}, fmt.Errorf("iterate recent models: %w", err)
 	}
 
 	return gs, nil

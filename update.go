@@ -46,12 +46,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case key.Matches(msg, m.keys.Search):
-		m.mode = ModeSearch
+		m.mode = modeSearch
 		m.search.Focus()
 		return m, textinput.Blink
 
 	case key.Matches(msg, m.keys.Workspaces):
-		m.mode = ModeWorkspaces
+		m.mode = modeWorkspaces
 		return m, nil
 
 	case key.Matches(msg, m.keys.Open):
@@ -65,14 +65,14 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		m.mode = ModeYank
+		m.mode = modeYank
 		return m, nil
 
 	case key.Matches(msg, m.keys.GotoPrefix):
 		if len(m.filtered) == 0 {
 			return m, nil
 		}
-		m.mode = ModeGoto
+		m.mode = modeGoto
 		return m, nil
 
 	case key.Matches(msg, m.keys.Delete):
@@ -80,11 +80,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.pendingDeleteID = m.filtered[m.cursor].ID
-		m.mode = ModeConfirmDelete
+		m.mode = modeConfirmDelete
 		return m, nil
 
 	case key.Matches(msg, m.keys.Stats):
-		m.mode = ModeStats
+		m.mode = modeStats
 		m.statsScrollOffset = 0
 		if m.globalStats == nil {
 			return m, m.loadGlobalStatsCmd()
@@ -95,12 +95,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateStats handles key events while ModeStats is active.
-// esc/q returns to ModeNormal; j/k scroll the stats body.
+// updateStats handles key events while modeStats is active.
+// esc/q returns to modeNormal; j/k scroll the stats body.
 func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 
 	case key.Matches(msg, m.keys.Up):
@@ -108,7 +108,9 @@ func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Down):
-		m.statsScrollOffset++
+		// scrollContent will clamp to actual content height at render time;
+		// cap the stored offset to prevent unbounded growth.
+		m.statsScrollOffset = clamp(m.statsScrollOffset+1, 0, m.height*4)
 		return m, nil
 	}
 	return m, nil
@@ -128,7 +130,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Workspaces), key.Matches(msg, m.keys.Back):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 
 	case key.Matches(msg, m.keys.Delete):
@@ -136,7 +138,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.pendingDeleteWorkspace = m.workspaces[m.workspaceCursor].Dir
-		m.mode = ModeConfirmDeleteWorkspace
+		m.mode = modeConfirmDeleteWorkspace
 		return m, nil
 	}
 
@@ -145,7 +147,7 @@ func (m model) updateWorkspaces(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Back) || key.Matches(msg, m.keys.Open) {
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		m.search.Blur()
 		return m, nil
 	}
@@ -170,14 +172,14 @@ func (m model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updateConfirmDeleteWorkspace handles key events while
-// ModeConfirmDeleteWorkspace is active. y or d confirms deletion of all
+// modeConfirmDeleteWorkspace is active. y or d confirms deletion of all
 // sessions in the pending workspace; n, esc, q, or ctrl+c cancels.
 func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Delete), key.Matches(msg, m.keys.Confirm):
 		ws := m.pendingDeleteWorkspace
 		m.pendingDeleteWorkspace = ""
-		m.mode = ModeWorkspaces
+		m.mode = modeWorkspaces
 
 		if ws == "" {
 			return m, nil
@@ -205,7 +207,7 @@ func (m model) updateConfirmDeleteWorkspace(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 
 	case key.Matches(msg, m.keys.Cancel):
 		m.pendingDeleteWorkspace = ""
-		m.mode = ModeWorkspaces
+		m.mode = modeWorkspaces
 		return m, nil
 	}
 
@@ -217,7 +219,7 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Delete), key.Matches(msg, m.keys.Confirm):
 		id := m.pendingDeleteID
 		m.pendingDeleteID = ""
-		m.mode = ModeNormal
+		m.mode = modeNormal
 
 		if id == "" {
 			return m, nil
@@ -240,30 +242,30 @@ func (m model) updateConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Cancel):
 		m.pendingDeleteID = ""
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 	}
 
 	return m, nil
 }
 
-// updateGoto handles key events while ModeGoto is active.
+// updateGoto handles key events while modeGoto is active.
 // s opens a shell in the session's directory; w jumps to the workspace view.
 // esc/q/n cancels back to normal mode.
 func (m model) updateGoto(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if len(m.filtered) == 0 {
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 	}
 	s := m.filtered[m.cursor]
 
 	switch {
 	case key.Matches(msg, m.keys.GotoShell):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, m.openShellCmd(s.Directory)
 
 	case key.Matches(msg, m.keys.GotoWorkspace):
-		m.mode = ModeWorkspaces
+		m.mode = modeWorkspaces
 		for i, ws := range m.workspaces {
 			if ws.Dir == s.Directory {
 				m.workspaceCursor = i
@@ -273,14 +275,14 @@ func (m model) updateGoto(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 	}
 
 	return m, nil
 }
 
-// updateError handles key events while ModeError is active.
+// updateError handles key events while modeError is active.
 // Only q and ctrl+c are accepted — the app is in a hard error state
 // and requires a restart to recover.
 func (m model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -294,22 +296,22 @@ func (m model) updateError(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // esc/q cancels back to normal mode.
 func (m model) updateYank(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if len(m.filtered) == 0 {
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 	}
 	s := m.filtered[m.cursor]
 
 	switch {
 	case key.Matches(msg, m.keys.YankDirectory):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, m.yankCmd(s.DisplayDirectory())
 
 	case key.Matches(msg, m.keys.YankSession):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, m.yankCmd(s.ID)
 
 	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
-		m.mode = ModeNormal
+		m.mode = modeNormal
 		return m, nil
 	}
 

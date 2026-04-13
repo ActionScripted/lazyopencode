@@ -29,7 +29,7 @@ const (
 	tblTokW                = 12  // merged "in/out" column replacing tblInW+tblOutW; header uses ↑/↓
 	tblTimeWC              = 4   // compact time column (normal: 8)
 	tblCostWC              = 5   // compact cost column (normal: 8)
-	tblGapC                = 2   // compact gap between columns (normal: 4)
+	tblGapC                = 2   // compact gap between columns (normal: 3)
 
 	// Fieldset padding (inside the border, each side).
 	fieldsetPadX = 2
@@ -57,7 +57,7 @@ type statsTableRow struct {
 
 // ── Top-level renderer ────────────────────────────────────────────────────────
 
-// renderStatsView is the top-level renderer for ModeStats.
+// renderStatsView is the top-level renderer for modeStats.
 func (m model) renderStatsView(w, h int) string {
 	topBar := renderTopBar(w)
 	hint := m.renderHint(w)
@@ -104,22 +104,22 @@ func (m model) renderStats(w, h int) string {
 			innerW = 10
 		}
 
-		allTimeKV := buildSummaryKV(
-			gs.TotalSessions, gs.TotalMessages,
-			gs.TotalInput, gs.TotalOutput,
-			gs.TotalCacheRead, gs.TotalCacheWrite,
-			gs.TotalDurationMS,
-			gs.TotalFiles, gs.TotalAdditions, gs.TotalDeletions,
-			innerW,
-		)
-		recentKV := buildSummaryKV(
-			gs.RecentSessions, gs.RecentMessages,
-			gs.RecentInput, gs.RecentOutput,
-			gs.RecentCacheRead, gs.RecentCacheWrite,
-			gs.RecentDurationMS,
-			gs.RecentFiles, gs.RecentAdditions, gs.RecentDeletions,
-			innerW,
-		)
+		allTimeKV := buildSummaryKV(summaryData{
+			sessions: gs.TotalSessions, turns: gs.TotalMessages,
+			input: gs.TotalInput, output: gs.TotalOutput,
+			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
+			durationMS: gs.TotalDurationMS,
+			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
+			innerW: innerW,
+		})
+		recentKV := buildSummaryKV(summaryData{
+			sessions: gs.RecentSessions, turns: gs.RecentMessages,
+			input: gs.RecentInput, output: gs.RecentOutput,
+			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
+			durationMS: gs.RecentDurationMS,
+			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
+			innerW: innerW,
+		})
 
 		for _, line := range strings.Split(renderFieldset("ALL TIME", allTimeKV, outerW, innerW), "\n") {
 			sb.WriteString(pad + line + "\n")
@@ -141,22 +141,22 @@ func (m model) renderStats(w, h int) string {
 			innerW = 10
 		}
 
-		allTimeKV := buildSummaryKV(
-			gs.TotalSessions, gs.TotalMessages,
-			gs.TotalInput, gs.TotalOutput,
-			gs.TotalCacheRead, gs.TotalCacheWrite,
-			gs.TotalDurationMS,
-			gs.TotalFiles, gs.TotalAdditions, gs.TotalDeletions,
-			innerW,
-		)
-		recentKV := buildSummaryKV(
-			gs.RecentSessions, gs.RecentMessages,
-			gs.RecentInput, gs.RecentOutput,
-			gs.RecentCacheRead, gs.RecentCacheWrite,
-			gs.RecentDurationMS,
-			gs.RecentFiles, gs.RecentAdditions, gs.RecentDeletions,
-			innerW,
-		)
+		allTimeKV := buildSummaryKV(summaryData{
+			sessions: gs.TotalSessions, turns: gs.TotalMessages,
+			input: gs.TotalInput, output: gs.TotalOutput,
+			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
+			durationMS: gs.TotalDurationMS,
+			files:      gs.TotalFiles, additions: gs.TotalAdditions, deletions: gs.TotalDeletions,
+			innerW: innerW,
+		})
+		recentKV := buildSummaryKV(summaryData{
+			sessions: gs.RecentSessions, turns: gs.RecentMessages,
+			input: gs.RecentInput, output: gs.RecentOutput,
+			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
+			durationMS: gs.RecentDurationMS,
+			files:      gs.RecentFiles, additions: gs.RecentAdditions, deletions: gs.RecentDeletions,
+			innerW: innerW,
+		})
 
 		left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW)
 		right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW)
@@ -166,25 +166,26 @@ func (m model) renderStats(w, h int) string {
 		}
 	}
 
+	// tblNameIndent spaces are prepended to the name column content in header
+	// and data rows; +1 for the trailing space after the rightmost column.
+	var fixedW int
+	if compact {
+		fixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
+	} else {
+		fixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+	}
+
 	// ── Models table ──────────────────────────────────────────────────────────
 	if len(gs.Models) > 0 {
 		sb.WriteString("\n")
 		sb.WriteString(renderSectionRule("MODELS", pad, avail))
 
-		// tblNameIndent spaces are prepended to the name column content in header
-		// and data rows; +1 for the trailing space after the rightmost column.
-		var modelFixedW int
-		if compact {
-			modelFixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
-		} else {
-			modelFixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
-		}
-		nameW := avail - modelFixedW
+		nameW := avail - fixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildModelRows(gs.Models)
-		sb.WriteString(renderModelHeader(pad, nameW, compact))
+		sb.WriteString(renderTableHeader(pad, nameW, compact))
 		sb.WriteString(renderTableRule(pad, avail))
 		sb.WriteString(renderModelRows(rows, pad, nameW, compact))
 	}
@@ -194,18 +195,12 @@ func (m model) renderStats(w, h int) string {
 		sb.WriteString("\n")
 		sb.WriteString(renderSectionRule("PROJECTS", pad, avail))
 
-		var projFixedW int
-		if compact {
-			projFixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
-		} else {
-			projFixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
-		}
-		nameW := avail - projFixedW
+		nameW := avail - fixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildProjectRows(gs.Projects)
-		sb.WriteString(renderProjectHeader(pad, nameW, compact))
+		sb.WriteString(renderTableHeader(pad, nameW, compact))
 		sb.WriteString(renderTableRule(pad, avail))
 		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
 	}
@@ -320,14 +315,16 @@ func renderFieldset(title, content string, outerW, innerW int) string {
 // buildSummaryKV returns a pre-formatted multi-line string of KV rows for a
 // fieldset. Labels are dim; sessions/turns are bold yellow; other values are
 // plain (inherit fg from parent block). Uses *Panel style variants.
-func buildSummaryKV(
-	sessions, turns int,
-	input, output int,
-	cacheRead, cacheWrite int,
-	durationMS int64,
-	files, additions, deletions int,
-	innerW int,
-) string {
+type summaryData struct {
+	sessions, turns             int
+	input, output               int
+	cacheRead, cacheWrite       int
+	durationMS                  int64
+	files, additions, deletions int
+	innerW                      int
+}
+
+func buildSummaryKV(d summaryData) string {
 	const labelW = 14
 
 	// kv builds "dim-label<spaces>value" right-aligning value to fill innerW.
@@ -336,7 +333,7 @@ func buildSummaryKV(
 		rawLabel := label + strings.Repeat(" ", max(0, labelW-len(label)))
 		styledLabel := styleDimPanel.Render(rawLabel)
 
-		valueW := innerW - labelW
+		valueW := d.innerW - labelW
 		if valueW < 1 {
 			valueW = 1
 		}
@@ -351,31 +348,31 @@ func buildSummaryKV(
 	blank := ""
 
 	var perSession string
-	if sessions > 0 && durationMS > 0 {
-		perSession = formatDurationMS(durationMS / int64(sessions))
+	if d.sessions > 0 && d.durationMS > 0 {
+		perSession = formatDurationMS(d.durationMS / int64(d.sessions))
 	} else {
 		perSession = "—"
 	}
 
 	// +N green, -N red — panel-background variants from styles.go to prevent bleed.
-	changes := styleAddPanel.Render("+"+fmtCommas(additions)) +
+	changes := styleAddPanel.Render("+"+formatCommas(d.additions)) +
 		styleSpPanel.Render(" / ") +
-		styleDelPanel.Render("-"+fmtCommas(deletions))
+		styleDelPanel.Render("-"+formatCommas(d.deletions))
 
 	rows := []string{
 		// sessions and turns: bold yellow to match table session count column.
-		kv("sessions", styleStatsCountPanel.Render(fmtCommas(sessions))),
-		kv("turns", styleStatsCountPanel.Render(fmtCommas(turns))),
+		kv("sessions", styleStatsCountPanel.Render(formatCommas(d.sessions))),
+		kv("turns", styleStatsCountPanel.Render(formatCommas(d.turns))),
 		blank,
-		kv("tokens in", formatTokens(input)),
-		kv("tokens out", formatTokens(output)),
-		kv("cache read", formatTokens(cacheRead)),
-		kv("cache write", formatTokens(cacheWrite)),
+		kv("tokens in", formatTokens(d.input)),
+		kv("tokens out", formatTokens(d.output)),
+		kv("cache read", formatTokens(d.cacheRead)),
+		kv("cache write", formatTokens(d.cacheWrite)),
 		blank,
-		kv("total time", formatDurationMS(durationMS)),
+		kv("total time", formatDurationMS(d.durationMS)),
 		kv("avg time", perSession),
 		blank,
-		kv("files", fmtCommas(files)),
+		kv("files", formatCommas(d.files)),
 		kv("changes", changes),
 	}
 	return strings.Join(rows, "\n")
@@ -383,8 +380,8 @@ func buildSummaryKV(
 
 // ── Models table ──────────────────────────────────────────────────────────────
 
-// buildModelRows converts []ModelStat to []statsTableRow.
-func buildModelRows(models []ModelStat) []statsTableRow {
+// buildModelRows converts []modelStat to []statsTableRow.
+func buildModelRows(models []modelStat) []statsTableRow {
 	rows := make([]statsTableRow, len(models))
 	for i, ms := range models {
 		rows[i] = statsTableRow{
@@ -400,75 +397,10 @@ func buildModelRows(models []ModelStat) []statsTableRow {
 	return rows
 }
 
-// renderModelHeader renders the column header row for the models table.
-func renderModelHeader(pad string, nameW int, compact bool) string {
-	hdr := styleStatsHeaderPanel
-	g := strings.Repeat(" ", tblGap)
-	if compact {
-		g = strings.Repeat(" ", tblGapC)
-	}
-	var sb strings.Builder
-	sb.WriteString(pad)
-	sb.WriteString(styleSpPanel.Render(padRight("", nameW)))
-	if compact {
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessWC, "sess")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnWC, "trns")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostWC, "cost")))
-	} else {
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
-	}
-	sb.WriteString(styleSpPanel.Render(" "))
-	sb.WriteString("\n")
-	return sb.String()
-}
-
-// renderModelRows renders all model rows.
-func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
-	var sb strings.Builder
-	g := strings.Repeat(" ", tblGap)
-	if compact {
-		g = strings.Repeat(" ", tblGapC)
-	}
-	for i, r := range rows {
-		sp, label, count := styleSpPanel, styleStatsLabelPanel, styleStatsCountPanel
-		if i%2 != 0 {
-			sp, label, count = styleSpPanelAlt, styleStatsLabelPanelAlt, styleStatsCountPanelAlt
-		}
-		name := "   " + truncate(r.name, nameW-tblNameIndent)
-		sb.WriteString(pad)
-		sb.WriteString(label.Render(padRight(name, nameW)))
-		if compact {
-			tok := formatTokensMerged(r.inputTokens, r.outTokens)
-			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
-			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(r.cost))))
-		} else {
-			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
-		}
-		sb.WriteString(sp.Render(" "))
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
 // ── Projects table ────────────────────────────────────────────────────────────
 
-// buildProjectRows converts []ProjectStat to []statsTableRow, with sub-rows.
-func buildProjectRows(projects []ProjectStat) []statsTableRow {
+// buildProjectRows converts []projectStat to []statsTableRow, with sub-rows.
+func buildProjectRows(projects []projectStat) []statsTableRow {
 	rows := make([]statsTableRow, len(projects))
 	for i, ps := range projects {
 		dir := ps.DisplayDir
@@ -508,8 +440,10 @@ func buildProjectRows(projects []ProjectStat) []statsTableRow {
 	return rows
 }
 
-// renderProjectHeader renders the column header row for the projects table.
-func renderProjectHeader(pad string, nameW int, compact bool) string {
+// ── Shared table rendering ────────────────────────────────────────────────────
+
+// renderTableHeader renders the shared column header row for both stats tables.
+func renderTableHeader(pad string, nameW int, compact bool) string {
 	hdr := styleStatsHeaderPanel
 	g := strings.Repeat(" ", tblGap)
 	if compact {
@@ -537,7 +471,50 @@ func renderProjectHeader(pad string, nameW int, compact bool) string {
 	return sb.String()
 }
 
+// renderTableCols writes the value columns for a single row into sb, using the
+// provided style for each cell. It handles both compact and normal layouts.
+func renderTableCols(sb *strings.Builder, r statsTableRow, g string, compact bool, sp, count lipgloss.Style) {
+	if compact {
+		tok := formatTokensMerged(r.inputTokens, r.outTokens)
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostWC, formatCost(r.cost))))
+	} else {
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
+		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, formatCost(r.cost))))
+	}
+}
+
+// renderModelRows renders all model rows with alternating row backgrounds.
+func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
+	var sb strings.Builder
+	g := strings.Repeat(" ", tblGap)
+	if compact {
+		g = strings.Repeat(" ", tblGapC)
+	}
+	for i, r := range rows {
+		sp, label, count := styleSpPanel, styleStatsLabelPanel, styleStatsCountPanel
+		if i%2 != 0 {
+			sp, label, count = styleSpPanelAlt, styleStatsLabelPanelAlt, styleStatsCountPanelAlt
+		}
+		name := "   " + truncate(r.name, nameW-tblNameIndent)
+		sb.WriteString(pad)
+		sb.WriteString(label.Render(padRight(name, nameW)))
+		renderTableCols(&sb, r, g, compact, sp, count)
+		sb.WriteString(sp.Render(" "))
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
 // renderProjectRows renders all project rows, each followed by dimmed model sub-rows.
+// In compact mode the project name is shortened to its last path component.
 func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
@@ -545,7 +522,6 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool
 		g = strings.Repeat(" ", tblGapC)
 	}
 	for _, r := range rows {
-		// Project row — standard background.
 		// In compact mode show only the last path component (e.g. "myapp" not "~/code/myapp").
 		displayName := r.name
 		if compact {
@@ -554,44 +530,16 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool
 		name := "   " + truncate(displayName, nameW-tblNameIndent)
 		sb.WriteString(pad)
 		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
-		if compact {
-			tok := formatTokensMerged(r.inputTokens, r.outTokens)
-			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
-			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(r.cost))))
-		} else {
-			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
-		}
+		renderTableCols(&sb, r, g, compact, styleSpPanel, styleStatsCountPanel)
 		sb.WriteString(styleSpPanel.Render(" "))
 		sb.WriteString("\n")
 
-		// Per-model sub-rows: lighter alt background, tblNameIndent + 2 extra spaces for the sub-indent.
+		// Per-model sub-rows: alt background, extra indent.
 		for _, sr := range r.subRows {
 			subName := "     " + truncate(sr.name, nameW-tblNameIndent-2)
 			sb.WriteString(pad)
 			sb.WriteString(styleDimPanelAlt.Render(padRight(subName, nameW)))
-			if compact {
-				tok := formatTokensMerged(sr.inputTokens, sr.outTokens)
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessWC, sr.sessions)))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnWC, sr.turns)))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(sr.durationMS))))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(sr.cost))))
-			} else {
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessW, sr.sessions)))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnW, sr.turns)))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(sr.inputTokens))))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(sr.outTokens))))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(sr.durationMS))))
-				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(sr.cost))))
-			}
+			renderTableCols(&sb, sr, g, compact, styleDimPanelAlt, styleDimPanelAlt)
 			sb.WriteString(styleSpPanelAlt.Render(" "))
 			sb.WriteString("\n")
 		}

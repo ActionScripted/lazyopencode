@@ -182,7 +182,7 @@ func TestFormatWorkspaceRow_SelectedContainsDir(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFormatWorkspaceSessionRow_ContainsDateAndTitle(t *testing.T) {
-	s := Session{
+	s := session{
 		Title:     "My session",
 		UpdatedAt: time.Date(2024, 3, 15, 9, 30, 0, 0, time.UTC),
 	}
@@ -197,7 +197,7 @@ func TestFormatWorkspaceSessionRow_ContainsDateAndTitle(t *testing.T) {
 }
 
 func TestFormatWorkspaceSessionRow_TruncatesLongTitle(t *testing.T) {
-	s := Session{
+	s := session{
 		Title:     strings.Repeat("x", 100),
 		UpdatedAt: time.Now(),
 	}
@@ -212,7 +212,7 @@ func TestFormatWorkspaceSessionRow_TruncatesLongTitle(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFormatSessionRow(t *testing.T) {
-	s := Session{
+	s := session{
 		Title:     "Fix the login bug",
 		ShortDir:  "myapp",
 		UpdatedAt: time.Date(2024, 6, 1, 14, 30, 0, 0, time.UTC),
@@ -286,7 +286,7 @@ func TestFormatSessionRow(t *testing.T) {
 
 func TestFormatSessionRow_TitleMinWidth(t *testing.T) {
 	// Even at extreme narrowness titleW should floor at 1, not go negative.
-	s := Session{Title: "X", ShortDir: "y", UpdatedAt: time.Now()}
+	s := session{Title: "X", ShortDir: "y", UpdatedAt: time.Now()}
 	got := formatSessionRow(s, 1, 0, false)
 	if got == "" {
 		t.Error("expected non-empty row even at width=1")
@@ -294,10 +294,10 @@ func TestFormatSessionRow_TitleMinWidth(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// fmtCommas
+// formatCommas
 // ---------------------------------------------------------------------------
 
-func TestFmtCommas(t *testing.T) {
+func TestFormatCommas(t *testing.T) {
 	tests := []struct {
 		n    int
 		want string
@@ -310,9 +310,9 @@ func TestFmtCommas(t *testing.T) {
 		{1234567, "1,234,567"},
 	}
 	for _, tc := range tests {
-		got := fmtCommas(tc.n)
+		got := formatCommas(tc.n)
 		if got != tc.want {
-			t.Errorf("fmtCommas(%d) = %q, want %q", tc.n, got, tc.want)
+			t.Errorf("formatCommas(%d) = %q, want %q", tc.n, got, tc.want)
 		}
 	}
 }
@@ -369,10 +369,10 @@ func TestModelCost(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// fmtCost
+// formatCost
 // ---------------------------------------------------------------------------
 
-func TestFmtCost(t *testing.T) {
+func TestFormatCost(t *testing.T) {
 	tests := []struct {
 		f    float64
 		want string
@@ -386,9 +386,9 @@ func TestFmtCost(t *testing.T) {
 		{1500.0, "$1.5K"},
 	}
 	for _, tc := range tests {
-		got := fmtCost(tc.f)
+		got := formatCost(tc.f)
 		if got != tc.want {
-			t.Errorf("fmtCost(%v) = %q, want %q", tc.f, got, tc.want)
+			t.Errorf("formatCost(%v) = %q, want %q", tc.f, got, tc.want)
 		}
 	}
 }

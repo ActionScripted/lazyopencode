@@ -7,9 +7,9 @@ import (
 )
 
 // makeSession is a convenience constructor for tests that only care about a
-// subset of Session fields.
-func makeSession(id, title, dir string) Session {
-	return Session{ID: id, Title: title, Directory: dir}
+// subset of session fields.
+func makeSession(id, title, dir string) session {
+	return session{ID: id, Title: title, Directory: dir}
 }
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ func makeSession(id, title, dir string) Session {
 // ---------------------------------------------------------------------------
 
 func TestFilterSessions_EmptyQuery(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "Alpha", "/a"),
 		makeSession("2", "Beta", "/b"),
 	}
@@ -28,7 +28,7 @@ func TestFilterSessions_EmptyQuery(t *testing.T) {
 }
 
 func TestFilterSessions_MatchTitle(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "Fix login bug", "/a"),
 		makeSession("2", "Refactor DB", "/b"),
 	}
@@ -39,7 +39,7 @@ func TestFilterSessions_MatchTitle(t *testing.T) {
 }
 
 func TestFilterSessions_MatchTitleCaseInsensitive(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "Fix Login Bug", "/a"),
 	}
 	got := filterSessions(sessions, "LOGIN")
@@ -49,9 +49,9 @@ func TestFilterSessions_MatchTitleCaseInsensitive(t *testing.T) {
 }
 
 func TestFilterSessions_MatchDirectory(t *testing.T) {
-	sessions := []Session{
-		makeSession("1", "Session A", "/home/user/projects/myapp"),
-		makeSession("2", "Session B", "/home/user/other"),
+	sessions := []session{
+		makeSession("1", "session A", "/home/user/projects/myapp"),
+		makeSession("2", "session B", "/home/user/other"),
 	}
 	got := filterSessions(sessions, "myapp")
 	if len(got) != 1 || got[0].ID != "1" {
@@ -60,7 +60,7 @@ func TestFilterSessions_MatchDirectory(t *testing.T) {
 }
 
 func TestFilterSessions_NoMatch(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "Alpha", "/a"),
 		makeSession("2", "Beta", "/b"),
 	}
@@ -71,7 +71,7 @@ func TestFilterSessions_NoMatch(t *testing.T) {
 }
 
 func TestFilterSessions_PartialMidString(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "Implement feature flag support", "/a"),
 		makeSession("2", "Write tests", "/b"),
 	}
@@ -93,7 +93,7 @@ func TestBuildWorkspaces_Empty(t *testing.T) {
 }
 
 func TestBuildWorkspaces_Deduplicates(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "A", "/tmp/proj"),
 		makeSession("2", "B", "/tmp/proj"),
 		makeSession("3", "C", "/tmp/proj"),
@@ -108,7 +108,7 @@ func TestBuildWorkspaces_Deduplicates(t *testing.T) {
 }
 
 func TestBuildWorkspaces_SortedByDir(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "A", "/tmp/zzz"),
 		makeSession("2", "B", "/tmp/aaa"),
 		makeSession("3", "C", "/tmp/mmm"),
@@ -129,7 +129,7 @@ func TestBuildWorkspaces_SortedByDir(t *testing.T) {
 func TestBuildWorkspaces_DisplayDirSubstituted(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, "projects", "lazyopencode")
-	sessions := []Session{makeSession("1", "A", dir)}
+	sessions := []session{makeSession("1", "A", dir)}
 
 	ws := buildWorkspaces(sessions, home)
 	if len(ws) != 1 {
@@ -145,14 +145,14 @@ func TestBuildWorkspaces_DisplayDirSubstituted(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRemoveSessionByID(t *testing.T) {
-	sessions := []Session{
+	sessions := []session{
 		makeSession("1", "A", "/a"),
 		makeSession("2", "B", "/b"),
 		makeSession("3", "C", "/c"),
 	}
 	tests := []struct {
 		name    string
-		input   []Session
+		input   []session
 		id      string
 		wantIDs []string
 	}{
@@ -225,13 +225,13 @@ func TestBaseName_HomeDir(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFilterSessions_EmptyQueryReturnsIndependentSlice(t *testing.T) {
-	original := []Session{
+	original := []session{
 		makeSession("1", "A", "/a"),
 		makeSession("2", "B", "/b"),
 	}
 	got := filterSessions(original, "")
 	// Append to the result — must not affect the original slice.
-	got = append(got, makeSession("3", "C", "/c"))
+	_ = append(got, makeSession("3", "C", "/c"))
 	if len(original) != 2 {
 		t.Errorf("original slice was aliased: len = %d, want 2", len(original))
 	}
@@ -242,11 +242,10 @@ func TestFilterSessions_EmptyQueryReturnsIndependentSlice(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHomeToTilde_EmptyHome(t *testing.T) {
-	// strings.Replace(s, "", "~", 1) inserts "~" before the first character.
-	// This test pins that boundary behaviour: an empty home string causes the
-	// tilde to be prepended to any path.
+	// An empty home string means we have no prefix to replace; the path is
+	// returned unchanged rather than prepending "~" to an arbitrary position.
 	got := homeToTilde("/some/path", "")
-	want := "~/some/path"
+	want := "/some/path"
 	if got != want {
 		t.Errorf("homeToTilde(%q, %q) = %q, want %q", "/some/path", "", got, want)
 	}

@@ -75,7 +75,7 @@ func TestLoadSessionsCmd_ReturnsSessionsLoadedMsg(t *testing.T) {
 	path := createTestDB(t)
 
 	db := openRW(t, path)
-	insertSession(t, db, "s1", "My Session", "/tmp/proj", 1000000, 2000000, nil)
+	insertSession(t, db, "s1", "My session", "/tmp/proj", 1000000, 2000000, nil)
 	_ = db.Close()
 
 	m := newModel(path, false)
@@ -325,9 +325,9 @@ func createCorruptDB(t *testing.T, path string) error {
 func TestUpdate_SessionsLoadedMsg(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 
-	sessions := []Session{
-		makeSession("s1", "Session One", "/tmp/dir-a"),
-		makeSession("s2", "Session Two", "/tmp/dir-b"),
+	sessions := []session{
+		makeSession("s1", "session One", "/tmp/dir-a"),
+		makeSession("s2", "session Two", "/tmp/dir-b"),
 	}
 	msg := sessionsLoadedMsg{sessions: sessions}
 
@@ -354,8 +354,8 @@ func TestUpdate_DbErrMsg(t *testing.T) {
 	result, _ := m.Update(dbErrMsg{err: errors.New("db is toast")})
 	rm := mustModel(t, result)
 
-	if rm.mode != ModeError {
-		t.Errorf("mode: got %v, want ModeError", rm.mode)
+	if rm.mode != modeError {
+		t.Errorf("mode: got %v, want modeError", rm.mode)
 	}
 	if rm.err == nil {
 		t.Fatal("expected err to be set, got nil")
@@ -374,8 +374,8 @@ func TestUpdate_OpErrMsg(t *testing.T) {
 	if rm.notice != "clipboard failed" {
 		t.Errorf("notice: got %q, want %q", rm.notice, "clipboard failed")
 	}
-	if rm.mode != ModeNormal {
-		t.Errorf("mode: got %v, want ModeNormal", rm.mode)
+	if rm.mode != modeNormal {
+		t.Errorf("mode: got %v, want modeNormal", rm.mode)
 	}
 }
 
@@ -407,11 +407,11 @@ func TestUpdate_SessionsDeleteErrMsg(t *testing.T) {
 
 func TestUpdate_StatsLoadedMsg_Accepted(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
-	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.filtered = []session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
 	m.cursor = 0
 	m.previewSessionID = "sess-1"
 
-	result, _ := m.Update(statsLoadedMsg{sessionID: "sess-1", stats: SessionStats{MsgCount: 42}})
+	result, _ := m.Update(statsLoadedMsg{sessionID: "sess-1", stats: sessionStats{MsgCount: 42}})
 	rm := mustModel(t, result)
 
 	if rm.stats == nil {
@@ -424,11 +424,11 @@ func TestUpdate_StatsLoadedMsg_Accepted(t *testing.T) {
 
 func TestUpdate_StatsLoadedMsg_Stale(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
-	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.filtered = []session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
 	m.cursor = 0
 	m.previewSessionID = "sess-1"
 
-	result, _ := m.Update(statsLoadedMsg{sessionID: "stale-id", stats: SessionStats{MsgCount: 99}})
+	result, _ := m.Update(statsLoadedMsg{sessionID: "stale-id", stats: sessionStats{MsgCount: 99}})
 	rm := mustModel(t, result)
 
 	if rm.stats != nil {
@@ -438,12 +438,12 @@ func TestUpdate_StatsLoadedMsg_Stale(t *testing.T) {
 
 func TestUpdate_MessagesLoadedMsg_Accepted(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
-	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.filtered = []session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
 	m.cursor = 0
 
 	result, _ := m.Update(messagesLoadedMsg{
 		sessionID: "sess-1",
-		messages:  []Message{{Role: "user", Text: "hello"}},
+		messages:  []message{{Role: "user", Text: "hello"}},
 	})
 	rm := mustModel(t, result)
 
@@ -457,12 +457,12 @@ func TestUpdate_MessagesLoadedMsg_Accepted(t *testing.T) {
 
 func TestUpdate_MessagesLoadedMsg_Stale(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
-	m.filtered = []Session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
+	m.filtered = []session{{ID: "sess-1", Title: "A", Directory: "/tmp/a"}}
 	m.cursor = 0
 
 	result, _ := m.Update(messagesLoadedMsg{
 		sessionID: "wrong-id",
-		messages:  []Message{{Role: "user", Text: "hello"}},
+		messages:  []message{{Role: "user", Text: "hello"}},
 	})
 	rm := mustModel(t, result)
 

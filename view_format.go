@@ -53,8 +53,8 @@ func formatDurationMS(ms int64) string {
 
 // ── Number formatting ─────────────────────────────────────────────────────────
 
-// fmtCommas formats an integer with thousands-separator commas (e.g. 12400 → "12,400").
-func fmtCommas(n int) string {
+// formatCommas formats an integer with thousands-separator commas (e.g. 12400 → "12,400").
+func formatCommas(n int) string {
 	s := fmt.Sprintf("%d", n)
 	if n < 1000 {
 		return s
@@ -134,14 +134,14 @@ func modelCost(name string, inputTokens, outputTokens int) float64 {
 	return 0
 }
 
-// fmtCost formats a USD cost as a compact string.
+// formatCost formats a USD cost as a compact string.
 //
 //	< $0.01  → "<$0.01"
 //	< $1     → "$0.42"
 //	< $10    → "$3.50"
 //	< $1000  → "$42.10"
 //	≥ $1000  → "$1.2K"
-func fmtCost(f float64) string {
+func formatCost(f float64) string {
 	if f <= 0 {
 		return "—"
 	}

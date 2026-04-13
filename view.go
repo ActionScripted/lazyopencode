@@ -90,15 +90,15 @@ func (m model) View() string {
 		h = defaultTermH
 	}
 
-	if m.mode == ModeWorkspaces {
+	if m.mode == modeWorkspaces {
 		return m.renderWorkspacesView(w, h)
 	}
 
-	if m.mode == ModeStats {
+	if m.mode == modeStats {
 		return m.renderStatsView(w, h)
 	}
 
-	if m.mode == ModeConfirmDeleteWorkspace {
+	if m.mode == modeConfirmDeleteWorkspace {
 		base := m.renderWorkspacesView(w, h)
 		return overlayModal(base, m.renderWorkspaceModal(), w, h)
 	}
@@ -151,19 +151,19 @@ func (m model) View() string {
 
 	base := topBar + "\n" + body + "\n" + hint
 
-	if m.mode == ModeError {
+	if m.mode == modeError {
 		return overlayModal(base, m.renderErrorModal(), w, h)
 	}
 
-	if m.mode == ModeConfirmDelete {
+	if m.mode == modeConfirmDelete {
 		return overlayModal(base, m.renderSessionModal(), w, h)
 	}
 
-	if m.mode == ModeYank {
+	if m.mode == modeYank {
 		return overlayModal(base, m.renderYankModal(), w, h)
 	}
 
-	if m.mode == ModeGoto {
+	if m.mode == modeGoto {
 		return overlayModal(base, m.renderGotoModal(), w, h)
 	}
 
@@ -175,7 +175,7 @@ func (m model) renderList(width, height int) string {
 
 	// search prefix — accent in search mode, dim in normal mode
 	prefix := styleSeparator.Render("> ")
-	if m.mode == ModeSearch {
+	if m.mode == modeSearch {
 		prefix = styleSearchPrefix.Render("> ")
 	}
 	sb.WriteString(prefix + m.search.View() + "\n")
@@ -404,19 +404,19 @@ func (m model) renderHint(width int) string {
 		hints = "  " + m.notice
 	} else {
 		switch m.mode {
-		case ModeSearch:
+		case modeSearch:
 			hints = "  enter/esc: back   type to filter"
-		case ModeWorkspaces:
+		case modeWorkspaces:
 			hints = "  j/k: up/down   d: del   w: workspace   q: quit"
-		case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
+		case modeConfirmDelete, modeConfirmDeleteWorkspace:
 			hints = "  y/d: confirm   n/esc: cancel"
-		case ModeYank:
+		case modeYank:
 			hints = "  d: directory   s: session id   esc: cancel"
-		case ModeGoto:
+		case modeGoto:
 			hints = "  s: shell   w: workspace   esc: cancel"
-		case ModeStats:
+		case modeStats:
 			hints = "  j/k: scroll   esc: back"
-		case ModeError:
+		case modeError:
 			hints = "  q: quit"
 		default:
 			hints = "  j/k: up/down   enter: open   /: search   s: stats   y: yank   g: goto   d: del   w: workspace   q: quit"
@@ -431,19 +431,19 @@ func (m model) renderHint(width int) string {
 
 	var badge string
 	switch m.mode {
-	case ModeSearch:
+	case modeSearch:
 		badge = styleModeSearch.Render("SEARCH")
-	case ModeWorkspaces:
+	case modeWorkspaces:
 		badge = styleModeWorkspaces.Render("WORKSPACES")
-	case ModeConfirmDelete, ModeConfirmDeleteWorkspace:
+	case modeConfirmDelete, modeConfirmDeleteWorkspace:
 		badge = styleModeConfirmDelete.Render("DELETE")
-	case ModeYank:
+	case modeYank:
 		badge = styleModeYank.Render("YANK")
-	case ModeGoto:
+	case modeGoto:
 		badge = styleModeGoto.Render("GOTO")
-	case ModeStats:
+	case modeStats:
 		badge = styleModeStats.Render("STATS")
-	case ModeError:
+	case modeError:
 		badge = styleModeError.Render("ERROR")
 	default:
 		badge = styleModeNormal.Render("NORMAL")
@@ -493,7 +493,7 @@ func (m model) renderHint(width int) string {
 // All width arithmetic is performed on plain text before any style is applied.
 // Adding a new decoration to any cell later only requires touching that cell's
 // style call — the numbers never need to change.
-func formatSessionRow(s Session, width, pathColW int, selected bool) string {
+func formatSessionRow(s session, width, pathColW int, selected bool) string {
 	const (
 		leadSp  = 1 // single leading space
 		minGap  = 2 // minimum spaces between title and path
