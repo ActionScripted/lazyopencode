@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -11,13 +12,24 @@ import (
 
 const (
 	// Fixed column widths for the stats tables (right-aligned values).
-	tblGap   = 4  // spaces before each value column
+	tblGap   = 3  // spaces before each value column
 	tblSessW = 8  // "sessions" column
 	tblTurnW = 6  // "turns" column
 	tblInW   = 10 // "tokens in" column
 	tblOutW  = 10 // "tokens out" column
 	tblTimeW = 8  // "time" column
 	tblCostW = 8  // "cost" column
+
+	// Compact-mode column widths (< statsCompactBreakpoint terminal columns).
+	// Two token columns are merged into one "↑in/↓out" column; time and cost
+	// shrink slightly; sessions and turns also tighten.
+	statsCompactBreakpoint = 100 // terminal width that triggers compact layout
+	tblSessWC              = 5   // compact sessions column (normal: 8)
+	tblTurnWC              = 4   // compact turns column (normal: 6)
+	tblTokW                = 12  // merged "in/out" column replacing tblInW+tblOutW; header uses ↑/↓
+	tblTimeWC              = 4   // compact time column (normal: 8)
+	tblCostWC              = 5   // compact cost column (normal: 8)
+	tblGapC                = 2   // compact gap between columns (normal: 4)
 
 	// Fieldset padding (inside the border, each side).
 	fieldsetPadX = 2
@@ -68,10 +80,11 @@ func (m model) renderStats(w, h int) string {
 	}
 
 	gs := m.globalStats
+	compact := w < statsCompactBreakpoint
 
 	var sb strings.Builder
 
-	// ── KV summary fieldsets (always side-by-side) ────────────────────────────
+	// ── KV summary fieldsets ───────────────────────────────────────────────────
 
 	// avail is the usable content width (inside the 2-space left indent,
 	// leaving a 1-char right margin so table content doesn't kiss the edge).
@@ -80,41 +93,78 @@ func (m model) renderStats(w, h int) string {
 		avail = 1
 	}
 
-	// Each fieldset's outer width is exactly half of avail minus the 2-col gap.
-	const fieldsetGap = 2
-	outerW := (avail - fieldsetGap) / 2
-	if outerW < 20 {
-		outerW = 20
-	}
-	// Inner text width: outer minus left+right borders (1 each) minus padding (fieldsetPadX each side).
-	innerW := outerW - 2 - fieldsetPadX*2
-	if innerW < 10 {
-		innerW = 10
-	}
+	if compact {
+		// Narrow: stack ALL TIME on top, LAST 7 DAYS below.
+		// Each fieldset takes the full avail width.
+		outerW := avail
+		if outerW < 20 {
+			outerW = 20
+		}
+		innerW := outerW - 2 - fieldsetPadX*2
+		if innerW < 10 {
+			innerW = 10
+		}
 
-	allTimeKV := buildSummaryKV(
-		gs.TotalSessions, gs.TotalMessages,
-		gs.TotalInput, gs.TotalOutput,
-		gs.TotalCacheRead, gs.TotalCacheWrite,
-		gs.TotalDurationMS,
-		gs.TotalFiles, gs.TotalAdditions, gs.TotalDeletions,
-		innerW,
-	)
-	recentKV := buildSummaryKV(
-		gs.RecentSessions, gs.RecentMessages,
-		gs.RecentInput, gs.RecentOutput,
-		gs.RecentCacheRead, gs.RecentCacheWrite,
-		gs.RecentDurationMS,
-		gs.RecentFiles, gs.RecentAdditions, gs.RecentDeletions,
-		innerW,
-	)
+		allTimeKV := buildSummaryKV(
+			gs.TotalSessions, gs.TotalMessages,
+			gs.TotalInput, gs.TotalOutput,
+			gs.TotalCacheRead, gs.TotalCacheWrite,
+			gs.TotalDurationMS,
+			gs.TotalFiles, gs.TotalAdditions, gs.TotalDeletions,
+			innerW,
+		)
+		recentKV := buildSummaryKV(
+			gs.RecentSessions, gs.RecentMessages,
+			gs.RecentInput, gs.RecentOutput,
+			gs.RecentCacheRead, gs.RecentCacheWrite,
+			gs.RecentDurationMS,
+			gs.RecentFiles, gs.RecentAdditions, gs.RecentDeletions,
+			innerW,
+		)
 
-	left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW)
-	right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW)
-	row := lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", fieldsetGap), right)
-	// pad + multilineString only indents line 1; indent every line.
-	for _, line := range strings.Split(row, "\n") {
-		sb.WriteString(pad + line + "\n")
+		for _, line := range strings.Split(renderFieldset("ALL TIME", allTimeKV, outerW, innerW), "\n") {
+			sb.WriteString(pad + line + "\n")
+		}
+		sb.WriteString("\n")
+		for _, line := range strings.Split(renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW), "\n") {
+			sb.WriteString(pad + line + "\n")
+		}
+	} else {
+		// Wide: side-by-side fieldsets.
+		const fieldsetGap = 2
+		outerW := (avail - fieldsetGap) / 2
+		if outerW < 20 {
+			outerW = 20
+		}
+		// Inner text width: outer minus left+right borders (1 each) minus padding (fieldsetPadX each side).
+		innerW := outerW - 2 - fieldsetPadX*2
+		if innerW < 10 {
+			innerW = 10
+		}
+
+		allTimeKV := buildSummaryKV(
+			gs.TotalSessions, gs.TotalMessages,
+			gs.TotalInput, gs.TotalOutput,
+			gs.TotalCacheRead, gs.TotalCacheWrite,
+			gs.TotalDurationMS,
+			gs.TotalFiles, gs.TotalAdditions, gs.TotalDeletions,
+			innerW,
+		)
+		recentKV := buildSummaryKV(
+			gs.RecentSessions, gs.RecentMessages,
+			gs.RecentInput, gs.RecentOutput,
+			gs.RecentCacheRead, gs.RecentCacheWrite,
+			gs.RecentDurationMS,
+			gs.RecentFiles, gs.RecentAdditions, gs.RecentDeletions,
+			innerW,
+		)
+
+		left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW)
+		right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW)
+		row := lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", fieldsetGap), right)
+		for _, line := range strings.Split(row, "\n") {
+			sb.WriteString(pad + line + "\n")
+		}
 	}
 
 	// ── Models table ──────────────────────────────────────────────────────────
@@ -124,15 +174,20 @@ func (m model) renderStats(w, h int) string {
 
 		// tblNameIndent spaces are prepended to the name column content in header
 		// and data rows; +1 for the trailing space after the rightmost column.
-		modelFixedW := tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		var modelFixedW int
+		if compact {
+			modelFixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
+		} else {
+			modelFixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		}
 		nameW := avail - modelFixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildModelRows(gs.Models)
-		sb.WriteString(renderModelHeader(pad, nameW))
+		sb.WriteString(renderModelHeader(pad, nameW, compact))
 		sb.WriteString(renderTableRule(pad, avail))
-		sb.WriteString(renderModelRows(rows, pad, nameW))
+		sb.WriteString(renderModelRows(rows, pad, nameW, compact))
 	}
 
 	// ── Projects table ────────────────────────────────────────────────────────
@@ -140,15 +195,20 @@ func (m model) renderStats(w, h int) string {
 		sb.WriteString("\n")
 		sb.WriteString(renderSectionRule("PROJECTS", pad, avail))
 
-		projFixedW := tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		var projFixedW int
+		if compact {
+			projFixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
+		} else {
+			projFixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		}
 		nameW := avail - projFixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildProjectRows(gs.Projects)
-		sb.WriteString(renderProjectHeader(pad, nameW))
+		sb.WriteString(renderProjectHeader(pad, nameW, compact))
 		sb.WriteString(renderTableRule(pad, avail))
-		sb.WriteString(renderProjectRows(rows, pad, nameW))
+		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
 	}
 
 	return sb.String()
@@ -316,27 +376,41 @@ func buildModelRows(models []ModelStat) []statsTableRow {
 }
 
 // renderModelHeader renders the column header row for the models table.
-func renderModelHeader(pad string, nameW int) string {
+func renderModelHeader(pad string, nameW int, compact bool) string {
 	hdr := styleStatsHeaderPanel
 	g := strings.Repeat(" ", tblGap)
+	if compact {
+		g = strings.Repeat(" ", tblGapC)
+	}
 	var sb strings.Builder
 	sb.WriteString(pad)
 	sb.WriteString(styleSpPanel.Render(padRight("", nameW)))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
+	if compact {
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessWC, "sess")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnWC, "trns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostWC, "cost")))
+	} else {
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
+	}
 	sb.WriteString(styleSpPanel.Render(" "))
 	sb.WriteString("\n")
 	return sb.String()
 }
 
 // renderModelRows renders all model rows.
-func renderModelRows(rows []statsTableRow, pad string, nameW int) string {
+func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
+	if compact {
+		g = strings.Repeat(" ", tblGapC)
+	}
 	for i, r := range rows {
 		sp, label, count := styleSpPanel, styleStatsLabelPanel, styleStatsCountPanel
 		if i%2 != 0 {
@@ -345,12 +419,21 @@ func renderModelRows(rows []statsTableRow, pad string, nameW int) string {
 		name := "   " + truncate(r.name, nameW-tblNameIndent)
 		sb.WriteString(pad)
 		sb.WriteString(label.Render(padRight(name, nameW)))
-		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
+		if compact {
+			tok := formatTokensMerged(r.inputTokens, r.outTokens)
+			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
+			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(r.cost))))
+		} else {
+			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
+			sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
+			sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
+		}
 		sb.WriteString(sp.Render(" "))
 		sb.WriteString("\n")
 	}
@@ -401,38 +484,66 @@ func buildProjectRows(projects []ProjectStat) []statsTableRow {
 }
 
 // renderProjectHeader renders the column header row for the projects table.
-func renderProjectHeader(pad string, nameW int) string {
+func renderProjectHeader(pad string, nameW int, compact bool) string {
 	hdr := styleStatsHeaderPanel
 	g := strings.Repeat(" ", tblGap)
+	if compact {
+		g = strings.Repeat(" ", tblGapC)
+	}
 	var sb strings.Builder
 	sb.WriteString(pad)
 	sb.WriteString(styleSpPanel.Render(padRight("", nameW)))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
-	sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
+	if compact {
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessWC, "sess")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnWC, "trns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostWC, "cost")))
+	} else {
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
+	}
 	sb.WriteString(styleSpPanel.Render(" "))
 	sb.WriteString("\n")
 	return sb.String()
 }
 
 // renderProjectRows renders all project rows, each followed by dimmed model sub-rows.
-func renderProjectRows(rows []statsTableRow, pad string, nameW int) string {
+func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
+	if compact {
+		g = strings.Repeat(" ", tblGapC)
+	}
 	for _, r := range rows {
 		// Project row — standard background.
-		name := "   " + truncate(r.name, nameW-tblNameIndent)
+		// In compact mode show only the last path component (e.g. "myapp" not "~/code/myapp").
+		displayName := r.name
+		if compact {
+			displayName = filepath.Base(r.name)
+		}
+		name := "   " + truncate(displayName, nameW-tblNameIndent)
 		sb.WriteString(pad)
 		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
-		sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-		sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-		sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
+		if compact {
+			tok := formatTokensMerged(r.inputTokens, r.outTokens)
+			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
+			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(r.cost))))
+		} else {
+			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
+			sb.WriteString(styleStatsCountPanel.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
+			sb.WriteString(styleSpPanel.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(r.cost))))
+		}
 		sb.WriteString(styleSpPanel.Render(" "))
 		sb.WriteString("\n")
 
@@ -441,12 +552,21 @@ func renderProjectRows(rows []statsTableRow, pad string, nameW int) string {
 			subName := "     " + truncate(sr.name, nameW-tblNameIndent-2)
 			sb.WriteString(pad)
 			sb.WriteString(styleDimPanelAlt.Render(padRight(subName, nameW)))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessW, sr.sessions)))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnW, sr.turns)))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(sr.inputTokens))))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(sr.outTokens))))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(sr.durationMS))))
-			sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(sr.cost))))
+			if compact {
+				tok := formatTokensMerged(sr.inputTokens, sr.outTokens)
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessWC, sr.sessions)))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnWC, sr.turns)))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(sr.durationMS))))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostWC, fmtCost(sr.cost))))
+			} else {
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblSessW, sr.sessions)))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*d", tblTurnW, sr.turns)))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(sr.inputTokens))))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(sr.outTokens))))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(sr.durationMS))))
+				sb.WriteString(styleDimPanelAlt.Render(g + fmt.Sprintf("%*s", tblCostW, fmtCost(sr.cost))))
+			}
 			sb.WriteString(styleSpPanelAlt.Render(" "))
 			sb.WriteString("\n")
 		}

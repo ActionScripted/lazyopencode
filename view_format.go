@@ -81,6 +81,13 @@ func formatTokens(n int) string {
 	}
 }
 
+// formatTokensMerged formats input and output token counts as a compact
+// merged string for compact-mode table columns: "in/out".
+// The ↑/↓ direction indicators live in the column header, not the values.
+func formatTokensMerged(input, output int) string {
+	return formatTokens(input) + "/" + formatTokens(output)
+}
+
 // ── Cost ──────────────────────────────────────────────────────────────────────
 
 // modelPricing holds per-token USD prices for a model family.
