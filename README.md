@@ -6,7 +6,7 @@
 
 ## Requirements
 
-Requires [OpenCode](https://opencode.ai) (duh). Supported platforms: `darwin/amd64`, `darwin/arm64`.
+Requires [OpenCode](https://opencode.ai) (duh). Supported platforms: `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`.
 
 ## Install
 
@@ -23,6 +23,12 @@ To upgrade:
 - download a binary from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest) and move it onto your `$PATH`
 - run `go install github.com/actionscripted/lazyopencode@latest` (requires Go 1.25+)
 - build from source with `make install` (requires Go 1.25+, symlinks to `~/.local/bin/lazyopencode`).
+
+### Linux
+
+    curl -fsSL https://raw.githubusercontent.com/ActionScripted/lazyopencode/main/install.sh | sh
+
+Installs to `/usr/local/bin`. Also works on macOS and for upgrading existing installs. Pin a version with `VERSION=v0.5.0` before the curl.
 
 ## Usage
 

@@ -27,6 +27,7 @@ lazyopencode is a terminal UI (TUI) for managing [opencode](https://opencode.ai)
 | `demo.go` | `demoSessions`, `demoMessages`, `demoStats`, `demoGlobalStats`, `demoFeaturedMessages` — hardcoded fake data for `--demo` mode |
 | `styles.go` | Lip Gloss color vars, style definitions, and panel-background style variants; all package-level `var`s |
 | `Makefile` | `build`, `install`, `fmt`, `vet`, `lint`, `test`, `check` targets |
+| `install.sh` | Shell installer; detects OS/arch, downloads the correct binary from GitHub Releases, installs to `/usr/local/bin` |
 | `.golangci.yml` | golangci-lint configuration |
 | `.editorconfig` | Editor conventions (tabs, UTF-8, trailing newlines) |
 
@@ -108,7 +109,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 | Workflow | File | Trigger | What it does |
 |----------|------|---------|-------------|
 | CI | `ci.yml` | Push to `main`, all PRs | Format check, `go vet`, golangci-lint, `go test` |
-| Release | `release.yml` | Push a `v*` tag | Vets + tests, cross-compiles for both macOS targets, publishes GitHub Release with binaries and auto-generated notes, and auto-updates the Homebrew tap |
+| Release | `release.yml` | Push a `v*` tag | Vets + tests, cross-compiles for macOS and Linux (`amd64`/`arm64`), publishes GitHub Release with binaries and auto-generated notes, and auto-updates the Homebrew tap |
 
 **Cutting a release:**
 
@@ -117,4 +118,4 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow builds `lazyopencode-<os>-<arch>` binaries for `darwin/amd64` and `darwin/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`. After publishing the GitHub Release, the workflow also commits updated version and sha256 values directly into the formula at `actionscripted/homebrew-lazyopencode` via the GitHub API, using the `TAP_GITHUB_TOKEN` secret.
+The release workflow builds `lazyopencode-<os>-<arch>` binaries for `darwin/amd64`, `darwin/arm64`, `linux/amd64`, and `linux/arm64` (pure-Go cross-compilation, `CGO_ENABLED=0`). The `main.version` variable is stamped with the tag name at build time via `-ldflags`. After publishing the GitHub Release, the workflow also commits updated version and sha256 values directly into the formula at `actionscripted/homebrew-lazyopencode` via the GitHub API, using the `TAP_GITHUB_TOKEN` secret.
