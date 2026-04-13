@@ -415,7 +415,7 @@ func (m model) renderHint(width int) string {
 		case ModeGoto:
 			hints = "  s: shell   w: workspace   esc: cancel"
 		case ModeStats:
-			hints = "  esc: back"
+			hints = "  j/k: scroll   esc: back"
 		case ModeError:
 			hints = "  q: quit"
 		default:

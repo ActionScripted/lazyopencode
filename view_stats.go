@@ -68,10 +68,9 @@ func (m model) renderStatsView(w, h int) string {
 	return topBar + "\n" + body + "\n" + hint
 }
 
-// renderStats renders the full stats dashboard body.
+// renderStats renders the full stats dashboard body, windowed to bodyH lines
+// starting at m.statsScrollOffset. Content that fits entirely is returned as-is.
 func (m model) renderStats(w, h int) string {
-	_ = h // reserved for future scrolling
-
 	const indent = 2
 	pad := strings.Repeat(" ", indent)
 
@@ -211,7 +210,33 @@ func (m model) renderStats(w, h int) string {
 		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
 	}
 
-	return sb.String()
+	// Window the full content to bodyH lines at the current scroll offset.
+	return scrollContent(sb.String(), m.statsScrollOffset, h)
+}
+
+// scrollContent windows a multi-line string to bodyH visible lines starting
+// at offset. The offset is clamped so it can never push the window past the
+// last line. An empty string is returned as-is.
+func scrollContent(content string, offset, bodyH int) string {
+	lines := strings.Split(content, "\n")
+	// Strip a single trailing empty line produced by the final "\n" so the
+	// total count reflects real content rows.
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	total := len(lines)
+	if total == 0 || bodyH <= 0 {
+		return content
+	}
+	maxOffset := max(0, total-bodyH)
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	end := offset + bodyH
+	if end > total {
+		end = total
+	}
+	return strings.Join(lines[offset:end], "\n")
 }
 
 // ── Section rule ──────────────────────────────────────────────────────────────

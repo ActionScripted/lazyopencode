@@ -85,6 +85,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Stats):
 		m.mode = ModeStats
+		m.statsScrollOffset = 0
 		if m.globalStats == nil {
 			return m, m.loadGlobalStatsCmd()
 		}
@@ -95,11 +96,19 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updateStats handles key events while ModeStats is active.
-// esc/q returns to ModeNormal.
+// esc/q returns to ModeNormal; j/k scroll the stats body.
 func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
 		m.mode = ModeNormal
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		m.statsScrollOffset = clamp(m.statsScrollOffset-1, 0, m.statsScrollOffset)
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		m.statsScrollOffset++
 		return m, nil
 	}
 	return m, nil

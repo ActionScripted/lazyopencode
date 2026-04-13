@@ -94,6 +94,7 @@ type model struct {
 	pendingDeleteID        string        // session ID awaiting delete confirmation
 	pendingDeleteWorkspace string        // workspace directory awaiting delete confirmation
 	globalStats            *GlobalStats  // cached aggregate stats; nil until first load
+	statsScrollOffset      int           // scroll position (in lines) for the stats view
 }
 
 func newModel(dbPath string, demoMode bool) model {
