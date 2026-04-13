@@ -275,11 +275,24 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 				header.WriteString(mdl)
 				header.WriteString("\n")
 			}
+			header.WriteString("\n")
 		}
 
-		// messages
+		// messages + prompts — both derived from the display slice so the
+		// counts match exactly what's rendered in the preview pane.
+		var msgCount, promptCount int
+		for _, msg := range m.messages {
+			msgCount++
+			if msg.Role == "user" {
+				promptCount++
+			}
+		}
 		header.WriteString(metaLabel("messages"))
-		fmt.Fprintf(&header, "%d", st.MsgCount)
+		fmt.Fprintf(&header, "%d", msgCount)
+		header.WriteString("\n")
+
+		header.WriteString(metaLabel("prompts"))
+		fmt.Fprintf(&header, "%d", promptCount)
 		header.WriteString("\n")
 
 		// context + tokens (only when AI turns exist)

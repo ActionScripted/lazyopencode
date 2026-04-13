@@ -14,21 +14,19 @@ const (
 	// Fixed column widths for the stats tables (right-aligned values).
 	tblGap   = 3  // spaces before each value column
 	tblSessW = 8  // "sessions" column
-	tblTurnW = 6  // "turns" column
+	tblPrmtW = 8  // "prompts" column
 	tblInW   = 10 // "tokens in" column
 	tblOutW  = 10 // "tokens out" column
 	tblTimeW = 8  // "time" column
-	tblCostW = 8  // "cost" column
 
 	// Compact-mode column widths (< statsCompactBreakpoint terminal columns).
-	// Two token columns are merged into one "↑in/↓out" column; time and cost
-	// shrink slightly; sessions and turns also tighten.
+	// Two token columns are merged into one "↑in/↓out" column; time shrinks
+	// slightly; sessions and prompts also tighten.
 	statsCompactBreakpoint = 100 // terminal width that triggers compact layout
 	tblSessWC              = 5   // compact sessions column (normal: 8)
-	tblTurnWC              = 4   // compact turns column (normal: 6)
+	tblPrmtWC              = 5   // compact prompts column (normal: 8)
 	tblTokW                = 12  // merged "in/out" column replacing tblInW+tblOutW; header uses ↑/↓
 	tblTimeWC              = 4   // compact time column (normal: 8)
-	tblCostWC              = 5   // compact cost column (normal: 8)
 	tblGapC                = 2   // compact gap between columns (normal: 3)
 
 	// Fieldset padding (inside the border, each side).
@@ -46,11 +44,10 @@ const (
 type statsTableRow struct {
 	name        string
 	sessions    int
-	turns       int
+	prompts     int
 	inputTokens int
 	outTokens   int
 	durationMS  int64
-	cost        float64
 	// subRows is non-nil for project rows; each entry is a model sub-row.
 	subRows []statsTableRow
 }
@@ -105,7 +102,7 @@ func (m model) renderStats(w, h int) string {
 		}
 
 		allTimeKV := buildSummaryKV(summaryData{
-			sessions: gs.TotalSessions, turns: gs.TotalMessages,
+			sessions: gs.TotalSessions, prompts: gs.TotalPrompts,
 			input: gs.TotalInput, output: gs.TotalOutput,
 			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
 			durationMS: gs.TotalDurationMS,
@@ -113,7 +110,7 @@ func (m model) renderStats(w, h int) string {
 			innerW: innerW,
 		})
 		recentKV := buildSummaryKV(summaryData{
-			sessions: gs.RecentSessions, turns: gs.RecentMessages,
+			sessions: gs.RecentSessions, prompts: gs.RecentPrompts,
 			input: gs.RecentInput, output: gs.RecentOutput,
 			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
 			durationMS: gs.RecentDurationMS,
@@ -142,7 +139,7 @@ func (m model) renderStats(w, h int) string {
 		}
 
 		allTimeKV := buildSummaryKV(summaryData{
-			sessions: gs.TotalSessions, turns: gs.TotalMessages,
+			sessions: gs.TotalSessions, prompts: gs.TotalPrompts,
 			input: gs.TotalInput, output: gs.TotalOutput,
 			cacheRead: gs.TotalCacheRead, cacheWrite: gs.TotalCacheWrite,
 			durationMS: gs.TotalDurationMS,
@@ -150,7 +147,7 @@ func (m model) renderStats(w, h int) string {
 			innerW: innerW,
 		})
 		recentKV := buildSummaryKV(summaryData{
-			sessions: gs.RecentSessions, turns: gs.RecentMessages,
+			sessions: gs.RecentSessions, prompts: gs.RecentPrompts,
 			input: gs.RecentInput, output: gs.RecentOutput,
 			cacheRead: gs.RecentCacheRead, cacheWrite: gs.RecentCacheWrite,
 			durationMS: gs.RecentDurationMS,
@@ -170,9 +167,9 @@ func (m model) renderStats(w, h int) string {
 	// and data rows; +1 for the trailing space after the rightmost column.
 	var fixedW int
 	if compact {
-		fixedW = tblGapC + tblSessWC + tblGapC + tblTurnWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostWC + tblNameIndent + 1
+		fixedW = tblGapC + tblSessWC + tblGapC + tblPrmtWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblNameIndent + 1
 	} else {
-		fixedW = tblGap + tblSessW + tblGap + tblTurnW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		fixedW = tblGap + tblSessW + tblGap + tblPrmtW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblNameIndent + 1
 	}
 
 	// ── Models table ──────────────────────────────────────────────────────────
@@ -204,12 +201,6 @@ func (m model) renderStats(w, h int) string {
 		sb.WriteString(renderTableRule(pad, avail))
 		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
 	}
-
-	// ── Cost footnote ─────────────────────────────────────────────────────────
-	sb.WriteString("\n")
-	sb.WriteString(pad + styleDimPanel.Render(strings.Repeat("─", avail)) + "\n")
-	const costNote = "Cost is estimated from token counts using known model pricing; opencode does not always record cost data, so figures may be incomplete or zero for some models."
-	sb.WriteString(styleStatsCostNote.Width(w-1).Padding(0, 2).Render(costNote) + "\n")
 
 	// Window the full content to bodyH lines at the current scroll offset.
 	return scrollContent(sb.String(), m.statsScrollOffset, h)
@@ -319,10 +310,10 @@ func renderFieldset(title, content string, outerW, innerW int) string {
 }
 
 // buildSummaryKV returns a pre-formatted multi-line string of KV rows for a
-// fieldset. Labels are dim; sessions/turns are bold yellow; other values are
+// fieldset. Labels are dim; sessions/prompts are bold yellow; other values are
 // plain (inherit fg from parent block). Uses *Panel style variants.
 type summaryData struct {
-	sessions, turns             int
+	sessions, prompts           int
 	input, output               int
 	cacheRead, cacheWrite       int
 	durationMS                  int64
@@ -366,9 +357,9 @@ func buildSummaryKV(d summaryData) string {
 		styleDelPanel.Render("-"+formatCommas(d.deletions))
 
 	rows := []string{
-		// sessions and turns: bold yellow to match table session count column.
+		// sessions and prompts: bold yellow to match table session count column.
 		kv("sessions", styleStatsCountPanel.Render(formatCommas(d.sessions))),
-		kv("turns", styleStatsCountPanel.Render(formatCommas(d.turns))),
+		kv("prompts", styleStatsCountPanel.Render(formatCommas(d.prompts))),
 		blank,
 		kv("tokens in", formatTokens(d.input)),
 		kv("tokens out", formatTokens(d.output)),
@@ -393,11 +384,10 @@ func buildModelRows(models []modelStat) []statsTableRow {
 		rows[i] = statsTableRow{
 			name:        ms.Name,
 			sessions:    ms.Sessions,
-			turns:       ms.Turns,
+			prompts:     ms.Prompts,
 			inputTokens: ms.InputTokens,
 			outTokens:   ms.OutputTokens,
 			durationMS:  ms.DurationMS,
-			cost:        modelCost(ms.Name, ms.InputTokens, ms.OutputTokens),
 		}
 	}
 	return rows
@@ -418,28 +408,19 @@ func buildProjectRows(projects []projectStat) []statsTableRow {
 			subRows[j] = statsTableRow{
 				name:        ms.Name,
 				sessions:    ms.Sessions,
-				turns:       ms.Turns,
+				prompts:     ms.Prompts,
 				inputTokens: ms.InputTokens,
 				outTokens:   ms.OutputTokens,
 				durationMS:  ms.DurationMS,
-				cost:        modelCost(ms.Name, ms.InputTokens, ms.OutputTokens),
 			}
-		}
-		// Project-level cost is the sum of sub-row costs. If there are no
-		// sub-rows (no model breakdown), fall back to cost with an empty name
-		// (which returns 0 — unknown model).
-		var totalCost float64
-		for _, sr := range subRows {
-			totalCost += sr.cost
 		}
 		rows[i] = statsTableRow{
 			name:        dir,
 			sessions:    ps.Sessions,
-			turns:       ps.Turns,
+			prompts:     ps.Prompts,
 			inputTokens: ps.InputTokens,
 			outTokens:   ps.OutputTokens,
 			durationMS:  ps.DurationMS,
-			cost:        totalCost,
 			subRows:     subRows,
 		}
 	}
@@ -460,17 +441,15 @@ func renderTableHeader(pad string, nameW int, compact bool) string {
 	sb.WriteString(styleSpPanel.Render(padRight("", nameW)))
 	if compact {
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessWC, "sess")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnWC, "trns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblPrmtWC, "prmt")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostWC, "cost")))
 	} else {
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessW, "sessions")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTurnW, "turns")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblPrmtW, "prompts")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblInW, "tokens in")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblOutW, "tokens out")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeW, "time")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
 	}
 	sb.WriteString(styleSpPanel.Render(" "))
 	sb.WriteString("\n")
@@ -483,17 +462,15 @@ func renderTableCols(sb *strings.Builder, r statsTableRow, g string, compact boo
 	if compact {
 		tok := formatTokensMerged(r.inputTokens, r.outTokens)
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
-		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnWC, r.turns)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblPrmtWC, r.prompts)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeWC, formatDurationMS(r.durationMS))))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostWC, formatCost(r.cost))))
 	} else {
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessW, r.sessions)))
-		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblTurnW, r.turns)))
+		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblPrmtW, r.prompts)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblInW, formatTokens(r.inputTokens))))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblOutW, formatTokens(r.outTokens))))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTimeW, formatDurationMS(r.durationMS))))
-		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblCostW, formatCost(r.cost))))
 	}
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"strings"
 	"testing"
 	"time"
@@ -336,59 +335,6 @@ func TestFormatDurationMS(t *testing.T) {
 		got := formatDurationMS(tc.ms)
 		if got != tc.want {
 			t.Errorf("formatDurationMS(%d) = %q, want %q", tc.ms, got, tc.want)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// modelCost
-// ---------------------------------------------------------------------------
-
-func TestModelCost(t *testing.T) {
-	tests := []struct {
-		name         string
-		model        string
-		inputTokens  int
-		outputTokens int
-		want         float64
-	}{
-		{"sonnet-4 input price", "claude-sonnet-4-6", 1_000_000, 0, 3.0},
-		{"opus-4 output price", "claude-opus-4-6", 0, 1_000_000, 75.0},
-		{"unknown model returns zero", "gpt-4o", 1_000_000, 1_000_000, 0},
-		{"zero tokens returns zero", "claude-sonnet-4-6", 0, 0, 0},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := modelCost(tc.model, tc.inputTokens, tc.outputTokens)
-			if math.Abs(got-tc.want) >= 0.001 {
-				t.Errorf("modelCost(%q, %d, %d) = %f, want %f",
-					tc.model, tc.inputTokens, tc.outputTokens, got, tc.want)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// formatCost
-// ---------------------------------------------------------------------------
-
-func TestFormatCost(t *testing.T) {
-	tests := []struct {
-		f    float64
-		want string
-	}{
-		{0, "—"},
-		{-1.0, "—"},
-		{0.001, "<$0.01"},
-		{0.42, "$0.42"},
-		{3.5, "$3.50"},
-		{42.1, "$42"},
-		{1500.0, "$1.5K"},
-	}
-	for _, tc := range tests {
-		got := formatCost(tc.f)
-		if got != tc.want {
-			t.Errorf("formatCost(%v) = %q, want %q", tc.f, got, tc.want)
 		}
 	}
 }

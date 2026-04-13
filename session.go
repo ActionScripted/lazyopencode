@@ -38,7 +38,7 @@ type sessionStats struct {
 type modelStat struct {
 	Name         string
 	Sessions     int
-	Turns        int // count of step-finish parts attributed to this model
+	Prompts      int // count of distinct user prompts responded to by this model
 	InputTokens  int
 	OutputTokens int
 	DurationMS   int64 // sum of (time_updated - time_created) for sessions using this model
@@ -49,7 +49,7 @@ type projectStat struct {
 	Dir          string
 	DisplayDir   string
 	Sessions     int
-	Turns        int // count of step-finish parts across all sessions in this project
+	Prompts      int // count of distinct user prompts across all sessions in this project
 	InputTokens  int
 	OutputTokens int
 	DurationMS   int64
@@ -60,7 +60,7 @@ type projectStat struct {
 type globalStats struct {
 	// All-time totals
 	TotalSessions   int
-	TotalMessages   int
+	TotalPrompts    int // count of user messages across all sessions
 	TotalInput      int
 	TotalOutput     int
 	TotalCacheRead  int
@@ -71,7 +71,7 @@ type globalStats struct {
 	TotalDurationMS int64 // sum of (time_updated - time_created) across all sessions
 	// Last-7-days totals
 	RecentSessions   int
-	RecentMessages   int
+	RecentPrompts    int // count of user messages in the last 7 days
 	RecentInput      int
 	RecentOutput     int
 	RecentCacheRead  int

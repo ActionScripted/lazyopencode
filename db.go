@@ -238,13 +238,14 @@ func loadStats(dbPath, sessionID string) (sessionStats, error) {
 // The work is split across three goroutines that each open their own read-only
 // connection so they can run concurrently:
 //
-//   - goroutine 1: all-time session + token totals (single collapsed query)
-//   - goroutine 2: last-7-days session + token totals (single collapsed query)
+//   - goroutine 1: all-time session + token totals + prompt count
+//   - goroutine 2: last-7-days session + token totals + prompt count
 //   - goroutine 3: model breakdown + per-project model breakdown
 //
-// Token and turn counts are read from the message table (assistant rows) rather
-// than the part table; the values are identical but the message table has a
-// covering index on session_id, making each query ~50× faster.
+// Prompts are counted as user-role messages. Token sums come from assistant-role
+// messages. Model attribution for prompts uses the parentID field on assistant
+// messages: each assistant message carries the ID of the user message that
+// triggered it, and each user prompt is always answered by exactly one model.
 //
 // home is the user's home directory (used for display path substitution) and
 // is passed explicitly so the function does not call os.UserHomeDir itself.
@@ -264,7 +265,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		err error
 	}
 	type recentResult struct {
-		sessions, messages                   int
+		sessions, prompts                    int
 		files, additions, deletions          int
 		input, output, cacheRead, cacheWrite int
 		durationMS                           int64
@@ -289,9 +290,8 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		}
 		defer func() { _ = db.Close() }()
 
-		// Single query: session metadata + assistant-message token sums joined.
-		// Using the message table for tokens avoids a full scan of the part table;
-		// assistant message rows carry the same token counts as step-finish parts.
+		// Prompt count via correlated subquery so it stays in one round-trip.
+		// Token sums come from assistant rows; prompt count from user rows.
 		var r allTimeResult
 		var input, output, cacheRead, cacheWrite *int
 		err = db.QueryRow(`
@@ -301,7 +301,9 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    COALESCE(SUM(COALESCE(s.summary_additions,0)),0),
 			    COALESCE(SUM(COALESCE(s.summary_deletions,0)),0),
 			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
-			    COUNT(m.id),
+			    (SELECT COUNT(*) FROM message mu
+			         JOIN session su ON su.id = mu.session_id AND su.parent_id IS NULL
+			         WHERE json_extract(mu.data,'$.role') = 'user'),
 			    SUM(json_extract(m.data,'$.tokens.input')),
 			    SUM(json_extract(m.data,'$.tokens.output')),
 			    SUM(json_extract(m.data,'$.tokens.cache.read')),
@@ -313,7 +315,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		`).Scan(
 			&r.gs.TotalSessions, &r.gs.TotalFiles, &r.gs.TotalAdditions,
 			&r.gs.TotalDeletions, &r.gs.TotalDurationMS,
-			&r.gs.TotalMessages, &input, &output, &cacheRead, &cacheWrite,
+			&r.gs.TotalPrompts, &input, &output, &cacheRead, &cacheWrite,
 		)
 		if err != nil {
 			allTimeCh <- allTimeResult{err: fmt.Errorf("query all-time totals: %w", err)}
@@ -352,7 +354,10 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			    COALESCE(SUM(COALESCE(s.summary_additions,0)),0),
 			    COALESCE(SUM(COALESCE(s.summary_deletions,0)),0),
 			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
-			    COUNT(m.id),
+			    (SELECT COUNT(*) FROM message mu
+			         JOIN session su ON su.id = mu.session_id AND su.parent_id IS NULL
+			         WHERE json_extract(mu.data,'$.role') = 'user'
+			           AND su.time_created > ?),
 			    SUM(json_extract(m.data,'$.tokens.input')),
 			    SUM(json_extract(m.data,'$.tokens.output')),
 			    SUM(json_extract(m.data,'$.tokens.cache.read')),
@@ -361,9 +366,9 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			LEFT JOIN message m ON m.session_id = s.id
 			    AND json_extract(m.data,'$.role') = 'assistant'
 			WHERE s.parent_id IS NULL AND s.time_created > ?
-		`, sevenDaysAgoMS).Scan(
+		`, sevenDaysAgoMS, sevenDaysAgoMS).Scan(
 			&r.sessions, &r.files, &r.additions, &r.deletions, &r.durationMS,
-			&r.messages, &input, &output, &cacheRead, &cacheWrite,
+			&r.prompts, &input, &output, &cacheRead, &cacheWrite,
 		)
 		if err != nil {
 			recentCh <- recentResult{err: fmt.Errorf("query recent totals: %w", err)}
@@ -395,10 +400,10 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 
 		var r breakdownResult
 
-		// Model breakdown: read model, turns, and tokens from the message table.
-		// Duration is summed per distinct session (SUM(DISTINCT s.dur)) so that
-		// sessions using multiple models don't get double-counted within a row —
-		// though a session's duration is still attributed to each model it used.
+		// Model breakdown: prompts attributed via parentID (each assistant message
+		// stores the ID of the user message that triggered it; COUNT DISTINCT gives
+		// the number of unique prompts answered by each model). Duration is summed
+		// per distinct session so multi-model sessions don't double-count.
 		modelRows, err := db.Query(`
 			SELECT
 			    COALESCE(
@@ -407,7 +412,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			        'unknown'
 			    ) AS model_name,
 			    COUNT(DISTINCT m.session_id),
-			    COUNT(*),
+			    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
 			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
@@ -424,7 +429,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		defer func() { _ = modelRows.Close() }()
 		for modelRows.Next() {
 			var ms modelStat
-			if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+			if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
 				breakdownCh <- breakdownResult{err: fmt.Errorf("scan model stat: %w", err)}
 				return
 			}
@@ -435,12 +440,13 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			return
 		}
 
-		// Project breakdown (top 10 by session count): tokens from message table.
+		// Project breakdown (top 10 by session count): prompts counted as user
+		// messages in sessions belonging to each project directory.
 		projRows, err := db.Query(`
 			SELECT
 			    s.directory,
 			    COUNT(DISTINCT s.id) AS cnt,
-			    COUNT(m.id),
+			    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
 			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
@@ -459,7 +465,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		defer func() { _ = projRows.Close() }()
 		for projRows.Next() {
 			var ps projectStat
-			if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Turns, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
+			if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Prompts, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
 				breakdownCh <- breakdownResult{err: fmt.Errorf("scan project stat: %w", err)}
 				return
 			}
@@ -471,7 +477,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			return
 		}
 
-		// Per-project model breakdown: same message-only approach.
+		// Per-project model breakdown: prompts via parentID, same as top-level model query.
 		if len(r.projects) > 0 {
 			projModelRows, err := db.Query(`
 				SELECT
@@ -482,7 +488,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 				        'unknown'
 				    ) AS model_name,
 				    COUNT(DISTINCT m.session_id),
-				    COUNT(*),
+				    COUNT(DISTINCT json_extract(m.data,'$.parentID')),
 				    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
 				    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
 				    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
@@ -506,7 +512,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 			for projModelRows.Next() {
 				var dir string
 				var ms modelStat
-				if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+				if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Prompts, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
 					breakdownCh <- breakdownResult{err: fmt.Errorf("scan project model stat: %w", err)}
 					return
 				}
@@ -536,7 +542,7 @@ func loadGlobalStats(dbPath, home string) (globalStats, error) {
 		return globalStats{}, recRes.err
 	}
 	gs.RecentSessions = recRes.sessions
-	gs.RecentMessages = recRes.messages
+	gs.RecentPrompts = recRes.prompts
 	gs.RecentFiles = recRes.files
 	gs.RecentAdditions = recRes.additions
 	gs.RecentDeletions = recRes.deletions

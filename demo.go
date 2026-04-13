@@ -544,7 +544,7 @@ func demoStats(sessionID string) sessionStats {
 func demoGlobalStats() globalStats {
 	return globalStats{
 		TotalSessions:   25,
-		TotalMessages:   82,
+		TotalPrompts:    82,
 		TotalInput:      312400,
 		TotalOutput:     48210,
 		TotalCacheRead:  93720,
@@ -555,7 +555,7 @@ func demoGlobalStats() globalStats {
 		TotalDurationMS: 93_600_000, // 26h total (~1h 3m avg)
 
 		RecentSessions:   4,
-		RecentMessages:   14,
+		RecentPrompts:    14,
 		RecentInput:      38100,
 		RecentOutput:     6820,
 		RecentCacheRead:  11430,
@@ -566,41 +566,41 @@ func demoGlobalStats() globalStats {
 		RecentDurationMS: 10_800_000, // 3h total (45m avg)
 
 		Models: []modelStat{
-			{Name: "claude-sonnet-4-6", Sessions: 18, Turns: 54, InputTokens: 241300, OutputTokens: 37200, DurationMS: 64_800_000},
-			{Name: "claude-opus-4-6", Sessions: 5, Turns: 12, InputTokens: 58400, OutputTokens: 8900, DurationMS: 21_600_000},
-			{Name: "claude-haiku-4-5-20251001", Sessions: 2, Turns: 4, InputTokens: 12700, OutputTokens: 2110, DurationMS: 7_200_000},
+			{Name: "claude-sonnet-4-6", Sessions: 18, Prompts: 54, InputTokens: 241300, OutputTokens: 37200, DurationMS: 64_800_000},
+			{Name: "claude-opus-4-6", Sessions: 5, Prompts: 12, InputTokens: 58400, OutputTokens: 8900, DurationMS: 21_600_000},
+			{Name: "claude-haiku-4-5-20251001", Sessions: 2, Prompts: 4, InputTokens: 12700, OutputTokens: 2110, DurationMS: 7_200_000},
 		},
 
 		Projects: []projectStat{
 			{
 				Dir: "/Users/demo/code/myapp", DisplayDir: "~/code/myapp",
-				Sessions: 9, Turns: 28, InputTokens: 142300, OutputTokens: 21400, DurationMS: 36_000_000,
+				Sessions: 9, Prompts: 28, InputTokens: 142300, OutputTokens: 21400, DurationMS: 36_000_000,
 				Models: []modelStat{
-					{Name: "claude-sonnet-4-6", Sessions: 6, Turns: 18, InputTokens: 98100, OutputTokens: 14800, DurationMS: 21_600_000},
-					{Name: "claude-opus-4-6", Sessions: 3, Turns: 8, InputTokens: 44200, OutputTokens: 6600, DurationMS: 14_400_000},
+					{Name: "claude-sonnet-4-6", Sessions: 6, Prompts: 18, InputTokens: 98100, OutputTokens: 14800, DurationMS: 21_600_000},
+					{Name: "claude-opus-4-6", Sessions: 3, Prompts: 8, InputTokens: 44200, OutputTokens: 6600, DurationMS: 14_400_000},
 				},
 			},
 			{
 				Dir: "/Users/demo/code/lazyopencode", DisplayDir: "~/code/lazyopencode",
-				Sessions: 7, Turns: 20, InputTokens: 98200, OutputTokens: 14700, DurationMS: 25_200_000,
+				Sessions: 7, Prompts: 20, InputTokens: 98200, OutputTokens: 14700, DurationMS: 25_200_000,
 				Models: []modelStat{
-					{Name: "claude-sonnet-4-6", Sessions: 5, Turns: 14, InputTokens: 71400, OutputTokens: 10900, DurationMS: 18_000_000},
-					{Name: "claude-haiku-4-5-20251001", Sessions: 2, Turns: 4, InputTokens: 26800, OutputTokens: 3800, DurationMS: 7_200_000},
+					{Name: "claude-sonnet-4-6", Sessions: 5, Prompts: 14, InputTokens: 71400, OutputTokens: 10900, DurationMS: 18_000_000},
+					{Name: "claude-haiku-4-5-20251001", Sessions: 2, Prompts: 4, InputTokens: 26800, OutputTokens: 3800, DurationMS: 7_200_000},
 				},
 			},
 			{
 				Dir: "/Users/demo/code/api", DisplayDir: "~/code/api",
-				Sessions: 5, Turns: 14, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000,
+				Sessions: 5, Prompts: 14, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000,
 				Models: []modelStat{
-					{Name: "claude-sonnet-4-6", Sessions: 5, Turns: 12, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000},
+					{Name: "claude-sonnet-4-6", Sessions: 5, Prompts: 12, InputTokens: 48100, OutputTokens: 7300, DurationMS: 18_000_000},
 				},
 			},
 			{
 				Dir: "/Users/demo/code/infra", DisplayDir: "~/code/infra",
-				Sessions: 4, Turns: 10, InputTokens: 23800, OutputTokens: 4810, DurationMS: 14_400_000,
+				Sessions: 4, Prompts: 10, InputTokens: 23800, OutputTokens: 4810, DurationMS: 14_400_000,
 				Models: []modelStat{
-					{Name: "claude-opus-4-6", Sessions: 2, Turns: 4, InputTokens: 14200, OutputTokens: 2900, DurationMS: 7_200_000},
-					{Name: "claude-sonnet-4-6", Sessions: 2, Turns: 6, InputTokens: 9600, OutputTokens: 1910, DurationMS: 7_200_000},
+					{Name: "claude-opus-4-6", Sessions: 2, Prompts: 4, InputTokens: 14200, OutputTokens: 2900, DurationMS: 7_200_000},
+					{Name: "claude-sonnet-4-6", Sessions: 2, Prompts: 6, InputTokens: 9600, OutputTokens: 1910, DurationMS: 7_200_000},
 				},
 			},
 		},
