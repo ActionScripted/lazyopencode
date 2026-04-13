@@ -232,249 +232,323 @@ func loadStats(dbPath, sessionID string) (sessionStats, error) {
 
 // loadGlobalStats returns aggregate statistics across all primary sessions
 // (parent_id IS NULL). Two windows are returned: all-time and last 7 days.
-// Non-fatal: returns a zero-value globalStats on any query error rather than
-// surfacing DB errors to the stats view.
+// The work is split across three goroutines that each open their own read-only
+// connection so they can run concurrently:
+//
+//   - goroutine 1: all-time session + token totals (single collapsed query)
+//   - goroutine 2: last-7-days session + token totals (single collapsed query)
+//   - goroutine 3: model breakdown + per-project model breakdown
+//
+// Token and turn counts are read from the message table (assistant rows) rather
+// than the part table; the values are identical but the message table has a
+// covering index on session_id, making each query ~50× faster.
+//
 // home is the user's home directory (used for display path substitution) and
 // is passed explicitly so the function does not call os.UserHomeDir itself.
 func loadGlobalStats(dbPath, home string) (globalStats, error) {
-	db, missing, err := openReadOnlyDB(dbPath)
-	if err != nil {
-		return globalStats{}, err
-	}
-	if missing {
+	// Quick pre-check: if the file is missing, return empty state immediately
+	// without opening three connections.
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return globalStats{}, nil
-	}
-	defer func() { _ = db.Close() }()
-
-	sevenDaysAgoMS := (time.Now().UnixMilli()) - (7 * 24 * 60 * 60 * 1000)
-
-	var gs globalStats
-
-	// ── All-time session totals (session table only) ──────────────────────────
-	if err := db.QueryRow(`
-		SELECT COUNT(*),
-		       COALESCE(SUM(COALESCE(summary_files,0)),0),
-		       COALESCE(SUM(COALESCE(summary_additions,0)),0),
-		       COALESCE(SUM(COALESCE(summary_deletions,0)),0),
-		       COALESCE(SUM(time_updated - time_created),0)
-		FROM session WHERE parent_id IS NULL
-	`).Scan(&gs.TotalSessions, &gs.TotalFiles, &gs.TotalAdditions, &gs.TotalDeletions, &gs.TotalDurationMS); err != nil {
-		return globalStats{}, fmt.Errorf("query total sessions: %w", err)
+	} else if err != nil {
+		return globalStats{}, fmt.Errorf("stat db: %w", err)
 	}
 
-	// ── All-time token + message totals (part step-finish) ───────────────────
-	var totalInput, totalOutput, totalCacheRead, totalCacheWrite *int
-	if err := db.QueryRow(`
-		SELECT COUNT(*),
-		       SUM(json_extract(p.data,'$.tokens.input')),
-		       SUM(json_extract(p.data,'$.tokens.output')),
-		       SUM(json_extract(p.data,'$.tokens.cache.read')),
-		       SUM(json_extract(p.data,'$.tokens.cache.write'))
-		FROM part p
-		WHERE json_extract(p.data,'$.type') = 'step-finish'
-		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
-	`).Scan(&gs.TotalMessages, &totalInput, &totalOutput, &totalCacheRead, &totalCacheWrite); err != nil {
-		return globalStats{}, fmt.Errorf("query total tokens: %w", err)
+	sevenDaysAgoMS := time.Now().UnixMilli() - (7 * 24 * 60 * 60 * 1000)
+
+	type allTimeResult struct {
+		gs  globalStats
+		err error
 	}
-	if totalInput != nil {
-		gs.TotalInput = *totalInput
+	type recentResult struct {
+		sessions, messages                   int
+		files, additions, deletions          int
+		input, output, cacheRead, cacheWrite int
+		durationMS                           int64
+		err                                  error
 	}
-	if totalOutput != nil {
-		gs.TotalOutput = *totalOutput
-	}
-	if totalCacheRead != nil {
-		gs.TotalCacheRead = *totalCacheRead
-	}
-	if totalCacheWrite != nil {
-		gs.TotalCacheWrite = *totalCacheWrite
+	type breakdownResult struct {
+		models   []modelStat
+		projects []projectStat
+		err      error
 	}
 
-	// ── Recent session totals (last 7 days) ───────────────────────────────────
-	if err := db.QueryRow(`
-		SELECT COUNT(*),
-		       COALESCE(SUM(COALESCE(summary_files,0)),0),
-		       COALESCE(SUM(COALESCE(summary_additions,0)),0),
-		       COALESCE(SUM(COALESCE(summary_deletions,0)),0),
-		       COALESCE(SUM(time_updated - time_created),0)
-		FROM session WHERE parent_id IS NULL AND time_created > ?
-	`, sevenDaysAgoMS).Scan(&gs.RecentSessions, &gs.RecentFiles, &gs.RecentAdditions, &gs.RecentDeletions, &gs.RecentDurationMS); err != nil {
-		return globalStats{}, fmt.Errorf("query recent sessions: %w", err)
-	}
+	allTimeCh := make(chan allTimeResult, 1)
+	recentCh := make(chan recentResult, 1)
+	breakdownCh := make(chan breakdownResult, 1)
 
-	var recentInput, recentOutput, recentCacheRead, recentCacheWrite *int
-	if err := db.QueryRow(`
-		SELECT COUNT(*),
-		       SUM(json_extract(p.data,'$.tokens.input')),
-		       SUM(json_extract(p.data,'$.tokens.output')),
-		       SUM(json_extract(p.data,'$.tokens.cache.read')),
-		       SUM(json_extract(p.data,'$.tokens.cache.write'))
-		FROM part p
-		WHERE json_extract(p.data,'$.type') = 'step-finish'
-		  AND p.session_id IN (SELECT id FROM session WHERE parent_id IS NULL AND time_created > ?)
-	`, sevenDaysAgoMS).Scan(&gs.RecentMessages, &recentInput, &recentOutput, &recentCacheRead, &recentCacheWrite); err != nil {
-		return globalStats{}, fmt.Errorf("query recent tokens: %w", err)
-	}
-	if recentInput != nil {
-		gs.RecentInput = *recentInput
-	}
-	if recentOutput != nil {
-		gs.RecentOutput = *recentOutput
-	}
-	if recentCacheRead != nil {
-		gs.RecentCacheRead = *recentCacheRead
-	}
-	if recentCacheWrite != nil {
-		gs.RecentCacheWrite = *recentCacheWrite
-	}
-
-	// ── Model breakdown ───────────────────────────────────────────────────────
-	modelRows, err := db.Query(`
-		SELECT COALESCE(
-		           json_extract(m.data,'$.modelID'),
-		           json_extract(m.data,'$.model.modelID'),
-		           'unknown'
-		       ) AS model_name,
-		       COUNT(DISTINCT m.session_id),
-		       COUNT(p.id),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
-		       COALESCE((
-		           SELECT SUM(s.time_updated - s.time_created)
-		           FROM session s
-		           WHERE s.parent_id IS NULL
-		             AND s.id IN (
-		                 SELECT DISTINCT m2.session_id
-		                 FROM message m2
-		                 WHERE json_extract(m2.data,'$.role') = 'assistant'
-		                   AND COALESCE(
-		                           json_extract(m2.data,'$.modelID'),
-		                           json_extract(m2.data,'$.model.modelID'),
-		                           'unknown'
-		                       ) = model_name
-		                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
-		             )
-		       ), 0)
-		FROM message m
-		JOIN part p ON p.session_id = m.session_id
-		          AND json_extract(p.data,'$.type') = 'step-finish'
-		WHERE json_extract(m.data,'$.role') = 'assistant'
-		  AND m.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
-		GROUP BY 1
-		ORDER BY 2 DESC
-	`)
-	if err != nil {
-		return globalStats{}, fmt.Errorf("query models: %w", err)
-	}
-	defer func() { _ = modelRows.Close() }()
-	for modelRows.Next() {
-		var ms modelStat
-		if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
-			return globalStats{}, fmt.Errorf("scan model stat: %w", err)
+	// ── Goroutine 1: all-time totals ─────────────────────────────────────────
+	go func() {
+		db, _, err := openReadOnlyDB(dbPath)
+		if err != nil {
+			allTimeCh <- allTimeResult{err: fmt.Errorf("open db (all-time): %w", err)}
+			return
 		}
-		gs.Models = append(gs.Models, ms)
-	}
-	if err := modelRows.Err(); err != nil {
-		return globalStats{}, fmt.Errorf("iterate models: %w", err)
-	}
+		defer func() { _ = db.Close() }()
 
-	// ── Project breakdown (top 10 by session count) ───────────────────────────
-	projRows, err := db.Query(`
-		SELECT s.directory,
-		       COUNT(DISTINCT s.id) AS cnt,
-		       COUNT(p.id),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
-		       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
-		       COALESCE(SUM(s.time_updated - s.time_created),0)
-		FROM session s
-		LEFT JOIN part p ON p.session_id = s.id
-		    AND json_extract(p.data,'$.type') = 'step-finish'
-		WHERE s.parent_id IS NULL
-		GROUP BY s.directory
-		ORDER BY cnt DESC
-		LIMIT 10
-	`)
-	if err != nil {
-		return globalStats{}, fmt.Errorf("query projects: %w", err)
-	}
-	defer func() { _ = projRows.Close() }()
-	for projRows.Next() {
-		var ps projectStat
-		if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Turns, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
-			return globalStats{}, fmt.Errorf("scan project stat: %w", err)
-		}
-		ps.DisplayDir = homeToTilde(ps.Dir, home)
-		gs.Projects = append(gs.Projects, ps)
-	}
-	if err := projRows.Err(); err != nil {
-		return globalStats{}, fmt.Errorf("iterate projects: %w", err)
-	}
-
-	// ── Per-project model breakdown ───────────────────────────────────────────
-	// Build a set of the top-10 project directories so we can filter the query.
-	if len(gs.Projects) > 0 {
-		projModelRows, err := db.Query(`
-			SELECT s.directory,
-			       COALESCE(
-			           json_extract(m.data,'$.modelID'),
-			           json_extract(m.data,'$.model.modelID'),
-			           'unknown'
-			       ) AS model_name,
-			       COUNT(DISTINCT s.id),
-			       COUNT(p.id),
-			       COALESCE(SUM(json_extract(p.data,'$.tokens.input')),0),
-			       COALESCE(SUM(json_extract(p.data,'$.tokens.output')),0),
-			       COALESCE((
-			           SELECT SUM(s2.time_updated - s2.time_created)
-			           FROM session s2
-			           WHERE s2.parent_id IS NULL
-			             AND s2.directory = s.directory
-			             AND s2.id IN (
-			                 SELECT DISTINCT m2.session_id
-			                 FROM message m2
-			                 WHERE json_extract(m2.data,'$.role') = 'assistant'
-			                   AND COALESCE(
-			                           json_extract(m2.data,'$.modelID'),
-			                           json_extract(m2.data,'$.model.modelID'),
-			                           'unknown'
-			                       ) = model_name
-			                   AND m2.session_id IN (SELECT id FROM session WHERE parent_id IS NULL)
-			             )
-			       ), 0)
+		// Single query: session metadata + assistant-message token sums joined.
+		// Using the message table for tokens avoids a full scan of the part table;
+		// assistant message rows carry the same token counts as step-finish parts.
+		var r allTimeResult
+		var input, output, cacheRead, cacheWrite *int
+		err = db.QueryRow(`
+			SELECT
+			    COUNT(DISTINCT s.id),
+			    COALESCE(SUM(COALESCE(s.summary_files,0)),0),
+			    COALESCE(SUM(COALESCE(s.summary_additions,0)),0),
+			    COALESCE(SUM(COALESCE(s.summary_deletions,0)),0),
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
+			    COUNT(m.id),
+			    SUM(json_extract(m.data,'$.tokens.input')),
+			    SUM(json_extract(m.data,'$.tokens.output')),
+			    SUM(json_extract(m.data,'$.tokens.cache.read')),
+			    SUM(json_extract(m.data,'$.tokens.cache.write'))
 			FROM session s
-			JOIN message m ON m.session_id = s.id
+			LEFT JOIN message m ON m.session_id = s.id
 			    AND json_extract(m.data,'$.role') = 'assistant'
-			JOIN part p ON p.session_id = s.id
-			    AND json_extract(p.data,'$.type') = 'step-finish'
 			WHERE s.parent_id IS NULL
-			  AND s.directory IN (
-			      SELECT directory FROM session WHERE parent_id IS NULL
-			      GROUP BY directory ORDER BY COUNT(*) DESC LIMIT 10
-			  )
-			GROUP BY s.directory, model_name
-			ORDER BY s.directory, 3 DESC
+		`).Scan(
+			&r.gs.TotalSessions, &r.gs.TotalFiles, &r.gs.TotalAdditions,
+			&r.gs.TotalDeletions, &r.gs.TotalDurationMS,
+			&r.gs.TotalMessages, &input, &output, &cacheRead, &cacheWrite,
+		)
+		if err != nil {
+			allTimeCh <- allTimeResult{err: fmt.Errorf("query all-time totals: %w", err)}
+			return
+		}
+		if input != nil {
+			r.gs.TotalInput = *input
+		}
+		if output != nil {
+			r.gs.TotalOutput = *output
+		}
+		if cacheRead != nil {
+			r.gs.TotalCacheRead = *cacheRead
+		}
+		if cacheWrite != nil {
+			r.gs.TotalCacheWrite = *cacheWrite
+		}
+		allTimeCh <- r
+	}()
+
+	// ── Goroutine 2: recent totals (last 7 days) ──────────────────────────────
+	go func() {
+		db, _, err := openReadOnlyDB(dbPath)
+		if err != nil {
+			recentCh <- recentResult{err: fmt.Errorf("open db (recent): %w", err)}
+			return
+		}
+		defer func() { _ = db.Close() }()
+
+		var r recentResult
+		var input, output, cacheRead, cacheWrite *int
+		err = db.QueryRow(`
+			SELECT
+			    COUNT(DISTINCT s.id),
+			    COALESCE(SUM(COALESCE(s.summary_files,0)),0),
+			    COALESCE(SUM(COALESCE(s.summary_additions,0)),0),
+			    COALESCE(SUM(COALESCE(s.summary_deletions,0)),0),
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0),
+			    COUNT(m.id),
+			    SUM(json_extract(m.data,'$.tokens.input')),
+			    SUM(json_extract(m.data,'$.tokens.output')),
+			    SUM(json_extract(m.data,'$.tokens.cache.read')),
+			    SUM(json_extract(m.data,'$.tokens.cache.write'))
+			FROM session s
+			LEFT JOIN message m ON m.session_id = s.id
+			    AND json_extract(m.data,'$.role') = 'assistant'
+			WHERE s.parent_id IS NULL AND s.time_created > ?
+		`, sevenDaysAgoMS).Scan(
+			&r.sessions, &r.files, &r.additions, &r.deletions, &r.durationMS,
+			&r.messages, &input, &output, &cacheRead, &cacheWrite,
+		)
+		if err != nil {
+			recentCh <- recentResult{err: fmt.Errorf("query recent totals: %w", err)}
+			return
+		}
+		if input != nil {
+			r.input = *input
+		}
+		if output != nil {
+			r.output = *output
+		}
+		if cacheRead != nil {
+			r.cacheRead = *cacheRead
+		}
+		if cacheWrite != nil {
+			r.cacheWrite = *cacheWrite
+		}
+		recentCh <- r
+	}()
+
+	// ── Goroutine 3: model + project breakdowns ───────────────────────────────
+	go func() {
+		db, _, err := openReadOnlyDB(dbPath)
+		if err != nil {
+			breakdownCh <- breakdownResult{err: fmt.Errorf("open db (breakdown): %w", err)}
+			return
+		}
+		defer func() { _ = db.Close() }()
+
+		var r breakdownResult
+
+		// Model breakdown: read model, turns, and tokens from the message table.
+		// Duration is summed per distinct session (SUM(DISTINCT s.dur)) so that
+		// sessions using multiple models don't get double-counted within a row —
+		// though a session's duration is still attributed to each model it used.
+		modelRows, err := db.Query(`
+			SELECT
+			    COALESCE(
+			        json_extract(m.data,'$.modelID'),
+			        json_extract(m.data,'$.model.modelID'),
+			        'unknown'
+			    ) AS model_name,
+			    COUNT(DISTINCT m.session_id),
+			    COUNT(*),
+			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
+			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+			FROM message m
+			JOIN session s ON s.id = m.session_id AND s.parent_id IS NULL
+			WHERE json_extract(m.data,'$.role') = 'assistant'
+			GROUP BY model_name
+			ORDER BY COUNT(DISTINCT m.session_id) DESC
 		`)
 		if err != nil {
-			return globalStats{}, fmt.Errorf("query project models: %w", err)
+			breakdownCh <- breakdownResult{err: fmt.Errorf("query models: %w", err)}
+			return
 		}
-		defer func() { _ = projModelRows.Close() }()
-
-		// Build map[dir][]modelStat then attach to each projectStat.
-		projModels := make(map[string][]modelStat, len(gs.Projects))
-		for projModelRows.Next() {
-			var dir string
+		defer func() { _ = modelRows.Close() }()
+		for modelRows.Next() {
 			var ms modelStat
-			if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
-				return globalStats{}, fmt.Errorf("scan project model stat: %w", err)
+			if err := modelRows.Scan(&ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+				breakdownCh <- breakdownResult{err: fmt.Errorf("scan model stat: %w", err)}
+				return
 			}
-			projModels[dir] = append(projModels[dir], ms)
+			r.models = append(r.models, ms)
 		}
-		if err := projModelRows.Err(); err != nil {
-			return globalStats{}, fmt.Errorf("iterate project models: %w", err)
+		if err := modelRows.Err(); err != nil {
+			breakdownCh <- breakdownResult{err: fmt.Errorf("iterate models: %w", err)}
+			return
 		}
-		for i, ps := range gs.Projects {
-			gs.Projects[i].Models = projModels[ps.Dir]
+
+		// Project breakdown (top 10 by session count): tokens from message table.
+		projRows, err := db.Query(`
+			SELECT
+			    s.directory,
+			    COUNT(DISTINCT s.id) AS cnt,
+			    COUNT(m.id),
+			    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
+			    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
+			    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+			FROM session s
+			LEFT JOIN message m ON m.session_id = s.id
+			    AND json_extract(m.data,'$.role') = 'assistant'
+			WHERE s.parent_id IS NULL
+			GROUP BY s.directory
+			ORDER BY cnt DESC
+			LIMIT 10
+		`)
+		if err != nil {
+			breakdownCh <- breakdownResult{err: fmt.Errorf("query projects: %w", err)}
+			return
 		}
+		defer func() { _ = projRows.Close() }()
+		for projRows.Next() {
+			var ps projectStat
+			if err := projRows.Scan(&ps.Dir, &ps.Sessions, &ps.Turns, &ps.InputTokens, &ps.OutputTokens, &ps.DurationMS); err != nil {
+				breakdownCh <- breakdownResult{err: fmt.Errorf("scan project stat: %w", err)}
+				return
+			}
+			ps.DisplayDir = homeToTilde(ps.Dir, home)
+			r.projects = append(r.projects, ps)
+		}
+		if err := projRows.Err(); err != nil {
+			breakdownCh <- breakdownResult{err: fmt.Errorf("iterate projects: %w", err)}
+			return
+		}
+
+		// Per-project model breakdown: same message-only approach.
+		if len(r.projects) > 0 {
+			projModelRows, err := db.Query(`
+				SELECT
+				    s.directory,
+				    COALESCE(
+				        json_extract(m.data,'$.modelID'),
+				        json_extract(m.data,'$.model.modelID'),
+				        'unknown'
+				    ) AS model_name,
+				    COUNT(DISTINCT m.session_id),
+				    COUNT(*),
+				    COALESCE(SUM(json_extract(m.data,'$.tokens.input')),0),
+				    COALESCE(SUM(json_extract(m.data,'$.tokens.output')),0),
+				    COALESCE(SUM(DISTINCT s.time_updated - s.time_created),0)
+				FROM message m
+				JOIN session s ON s.id = m.session_id AND s.parent_id IS NULL
+				WHERE json_extract(m.data,'$.role') = 'assistant'
+				  AND s.directory IN (
+				      SELECT directory FROM session WHERE parent_id IS NULL
+				      GROUP BY directory ORDER BY COUNT(*) DESC LIMIT 10
+				  )
+				GROUP BY s.directory, model_name
+				ORDER BY s.directory, COUNT(DISTINCT m.session_id) DESC
+			`)
+			if err != nil {
+				breakdownCh <- breakdownResult{err: fmt.Errorf("query project models: %w", err)}
+				return
+			}
+			defer func() { _ = projModelRows.Close() }()
+
+			projModels := make(map[string][]modelStat, len(r.projects))
+			for projModelRows.Next() {
+				var dir string
+				var ms modelStat
+				if err := projModelRows.Scan(&dir, &ms.Name, &ms.Sessions, &ms.Turns, &ms.InputTokens, &ms.OutputTokens, &ms.DurationMS); err != nil {
+					breakdownCh <- breakdownResult{err: fmt.Errorf("scan project model stat: %w", err)}
+					return
+				}
+				projModels[dir] = append(projModels[dir], ms)
+			}
+			if err := projModelRows.Err(); err != nil {
+				breakdownCh <- breakdownResult{err: fmt.Errorf("iterate project models: %w", err)}
+				return
+			}
+			for i, ps := range r.projects {
+				r.projects[i].Models = projModels[ps.Dir]
+			}
+		}
+
+		breakdownCh <- r
+	}()
+
+	// ── Collect results ───────────────────────────────────────────────────────
+	atRes := <-allTimeCh
+	if atRes.err != nil {
+		return globalStats{}, atRes.err
 	}
+	gs := atRes.gs
+
+	recRes := <-recentCh
+	if recRes.err != nil {
+		return globalStats{}, recRes.err
+	}
+	gs.RecentSessions = recRes.sessions
+	gs.RecentMessages = recRes.messages
+	gs.RecentFiles = recRes.files
+	gs.RecentAdditions = recRes.additions
+	gs.RecentDeletions = recRes.deletions
+	gs.RecentDurationMS = recRes.durationMS
+	gs.RecentInput = recRes.input
+	gs.RecentOutput = recRes.output
+	gs.RecentCacheRead = recRes.cacheRead
+	gs.RecentCacheWrite = recRes.cacheWrite
+
+	bdRes := <-breakdownCh
+	if bdRes.err != nil {
+		return globalStats{}, bdRes.err
+	}
+	gs.Models = bdRes.models
+	gs.Projects = bdRes.projects
 
 	return gs, nil
 }

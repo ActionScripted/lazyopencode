@@ -205,6 +205,12 @@ func (m model) renderStats(w, h int) string {
 		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
 	}
 
+	// ── Cost footnote ─────────────────────────────────────────────────────────
+	sb.WriteString("\n")
+	sb.WriteString(pad + styleDimPanel.Render(strings.Repeat("─", avail)) + "\n")
+	const costNote = "Cost is estimated from token counts using known model pricing; opencode does not always record cost data, so figures may be incomplete or zero for some models."
+	sb.WriteString(styleStatsCostNote.Width(w-1).Padding(0, 2).Render(costNote) + "\n")
+
 	// Window the full content to bodyH lines at the current scroll offset.
 	return scrollContent(sb.String(), m.statsScrollOffset, h)
 }

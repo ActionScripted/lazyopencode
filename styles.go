@@ -132,6 +132,7 @@ var (
 	styleStatsLabelPanel  = lipgloss.NewStyle().Foreground(colorFg).Background(colorBgPanel)
 	styleStatsCountPanel  = lipgloss.NewStyle().Foreground(colorYellow).Bold(true).Background(colorBgPanel)
 	styleStatsHeaderPanel = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
+	styleStatsCostNote    = lipgloss.NewStyle().Foreground(colorDim).Italic(true).Background(colorBgPanel)
 
 	// Zebra-stripe alt-background variants for stats table data rows (odd rows).
 	styleSpPanelAlt         = lipgloss.NewStyle().Background(colorBgPanelAlt)
