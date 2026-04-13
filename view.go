@@ -360,6 +360,10 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		msgSection = "\n" + styleDim.Render("  no messages")
 
 	default:
+		// Reserve 1 line for the "showing last N messages" indicator —
+		// it is always shown when we truncate, so deduct it upfront.
+		walkHeight := msgHeight - 1
+
 		// Determine which messages are visible without rendering all of them.
 		// Walk backwards from the last message, accumulating line cost, until
 		// we exceed the available height. Only the visible subset is rendered.
@@ -384,14 +388,32 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		used := 0
 		first := len(m.messages)
 		for i := len(m.messages) - 1; i >= 0; i-- {
-			if used+costs[i] > msgHeight {
+			if used+costs[i] > walkHeight {
 				break
 			}
 			used += costs[i]
 			first = i
 		}
+		// Fallback: if even the last message alone exceeds the available
+		// height, force it visible so the pane never renders blank.
+		clipped := false
+		if first == len(m.messages) {
+			first = len(m.messages) - 1
+			clipped = true
+		}
 
 		var sb strings.Builder
+		if first > 0 {
+			n := len(m.messages) - first
+			indicator := lipgloss.NewStyle().
+				Width(inner).
+				Align(lipgloss.Center).
+				Italic(true).
+				Foreground(colorDim).
+				Render(fmt.Sprintf("showing last %d messages", n))
+			sb.WriteString(indicator)
+			sb.WriteString("\n")
+		}
 		for i := first; i < len(m.messages); i++ {
 			msg := m.messages[i]
 			var label string
@@ -400,7 +422,40 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 			} else {
 				label = styleRoleAssistant.Render("[asst]")
 			}
-			wrapped := lipgloss.NewStyle().Width(inner).Render(msg.Text)
+
+			// In the fallback case the last (and only) message may be taller
+			// than the pane. Clip its text to the lines that actually fit:
+			// available = walkHeight minus label line and trailing blank.
+			text := msg.Text
+			if clipped && i == first {
+				avail := walkHeight - 2 // label + blank sep
+				if avail < 1 {
+					avail = 1
+				}
+				// Expand the text into wrapped display lines and keep only the first avail.
+				var displayLines []string
+				for _, raw := range strings.Split(text, "\n") {
+					if inner > 0 && lipgloss.Width(raw) > inner {
+						for len(raw) > 0 {
+							cut := raw
+							if lipgloss.Width(cut) > inner {
+								cut = raw[:inner]
+							}
+							displayLines = append(displayLines, cut)
+							raw = raw[len(cut):]
+						}
+					} else {
+						displayLines = append(displayLines, raw)
+					}
+				}
+				if len(displayLines) > avail {
+					displayLines = displayLines[:avail-1]
+					displayLines = append(displayLines, styleDim.Render("…"))
+				}
+				text = strings.Join(displayLines, "\n")
+			}
+
+			wrapped := lipgloss.NewStyle().Width(inner).Render(text)
 			sb.WriteString("\n")
 			sb.WriteString(label + "\n" + wrapped)
 			sb.WriteString("\n")
