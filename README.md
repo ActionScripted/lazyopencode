@@ -10,25 +10,29 @@ Requires [OpenCode](https://opencode.ai) (duh). Supported platforms: `darwin/amd
 
 ## Install
 
-### Homebrew via [homebrew-lazyopencode](https://github.com/ActionScripted/homebrew-lazyopencode)
+**Homebrew** via [homebrew-lazyopencode](https://github.com/ActionScripted/homebrew-lazyopencode):
 
-    brew install actionscripted/lazyopencode/lazyopencode
+```bash
+# One-time install:
+brew install actionscripted/lazyopencode/lazyopencode
 
-To upgrade:
+# Upgrade:
+brew upgrade lazyopencode
+```
 
-    brew upgrade lazyopencode
+**Linux**:
 
-**Other methods:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/ActionScripted/lazyopencode/main/install.sh | sh
+```
+
+Installs to `/usr/local/bin`. Pin version with `VERSION=v0.5.0` before the curl.
+
+**Other:**
 
 - download a `.tar.gz` archive from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest), extract it, and move the binary onto your `$PATH`
 - run `go install github.com/actionscripted/lazyopencode@latest` (requires Go 1.25+)
 - build from source with `make install` (requires Go 1.25+, symlinks to `~/.local/bin/lazyopencode`).
-
-### Linux
-
-    curl -fsSL https://raw.githubusercontent.com/ActionScripted/lazyopencode/main/install.sh | sh
-
-Installs to `/usr/local/bin`. Also works on macOS and for upgrading existing installs. Pin a version with `VERSION=v0.5.0` before the curl.
 
 ## Usage
 
@@ -75,15 +79,15 @@ brew install golangci-lint
 go install golang.org/x/tools/cmd/goimports@latest
 ```
 
-| Command           | What it does                                    |
-| ----------------- | ----------------------------------------------- |
-| `make check`      | fmt + vet + lint + test (run before committing) |
-| `make fmt`        | Format with gofmt and goimports                 |
-| `make vet`        | Run go vet                                      |
-| `make lint`       | Run golangci-lint                               |
-| `make test`       | Run go test ./...                               |
-| `make snapshot`   | Build a local snapshot via GoReleaser (no publish) |
-| `make release-check` | Validate `.goreleaser.yaml`                  |
+| Command              | What it does                                       |
+| -------------------- | -------------------------------------------------- |
+| `make check`         | fmt + vet + lint + test (run before committing)    |
+| `make fmt`           | Format with gofmt and goimports                    |
+| `make vet`           | Run go vet                                         |
+| `make lint`          | Run golangci-lint                                  |
+| `make test`          | Run go test ./...                                  |
+| `make snapshot`      | Build a local snapshot via GoReleaser (no publish) |
+| `make release-check` | Validate `.goreleaser.yaml`                        |
 
 ## Releases
 
