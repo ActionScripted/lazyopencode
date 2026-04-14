@@ -20,7 +20,7 @@ To upgrade:
 
 **Other methods:**
 
-- download a binary from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest) and move it onto your `$PATH`
+- download a `.tar.gz` archive from [GitHub Releases](https://github.com/ActionScripted/lazyopencode/releases/latest), extract it, and move the binary onto your `$PATH`
 - run `go install github.com/actionscripted/lazyopencode@latest` (requires Go 1.25+)
 - build from source with `make install` (requires Go 1.25+, symlinks to `~/.local/bin/lazyopencode`).
 
@@ -75,17 +75,19 @@ brew install golangci-lint
 go install golang.org/x/tools/cmd/goimports@latest
 ```
 
-| Command      | What it does                                    |
-| ------------ | ----------------------------------------------- |
-| `make check` | fmt + vet + lint + test (run before committing) |
-| `make fmt`   | Format with gofmt and goimports                 |
-| `make vet`   | Run go vet                                      |
-| `make lint`  | Run golangci-lint                               |
-| `make test`  | Run go test ./...                               |
+| Command           | What it does                                    |
+| ----------------- | ----------------------------------------------- |
+| `make check`      | fmt + vet + lint + test (run before committing) |
+| `make fmt`        | Format with gofmt and goimports                 |
+| `make vet`        | Run go vet                                      |
+| `make lint`       | Run golangci-lint                               |
+| `make test`       | Run go test ./...                               |
+| `make snapshot`   | Build a local snapshot via GoReleaser (no publish) |
+| `make release-check` | Validate `.goreleaser.yaml`                  |
 
 ## Releases
 
-Releases are cut by pushing a semver tag. The GitHub Actions release workflow builds binaries for all supported platforms and publishes them to GitHub Releases with auto-generated release notes. Pushing a release will also auto-update the Homebrew repo.
+Releases are cut by pushing a semver tag. GoReleaser builds `.tar.gz` archives for all supported platforms, publishes them to GitHub Releases alongside `install.sh` and a `checksums.txt`, and auto-updates the Homebrew tap formula.
 
 ```sh
 git tag v0.1.0

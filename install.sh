@@ -9,9 +9,9 @@ case "$(uname -s)" in
   Linux*)  OS="linux"  ;;
   Darwin*) OS="darwin" ;;
   *)
-           echo "error: unsupported OS: $(uname -s)"
-                                                      exit 1
-                                                             ;;
+    echo "error: unsupported OS: $(uname -s)"
+    exit 1
+    ;;
 esac
 
 # Detect architecture
@@ -21,33 +21,34 @@ case "$(uname -m)" in
   aarch64) ARCH="arm64" ;;
   arm64)   ARCH="arm64" ;;
   *)
-           echo "error: unsupported architecture: $(uname -m)"
-                                                                exit 1
-                                                                       ;;
+    echo "error: unsupported architecture: $(uname -m)"
+    exit 1
+    ;;
 esac
 
 # Resolve version (latest release unless VERSION is set)
 if [ -z "${VERSION:-}" ]; then
-    VERSION=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
-        "https://github.com/${REPO}/releases/latest" | rev | cut -d/ -f1 | rev)
+  VERSION=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+    "https://github.com/${REPO}/releases/latest" | rev | cut -d/ -f1 | rev)
 fi
 
-BINARY="lazyopencode-${OS}-${ARCH}"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
+VERSION_NUM="${VERSION#v}"
+ARCHIVE="lazyopencode_${VERSION_NUM}_${OS}_${ARCH}.tar.gz"
+URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE}"
 
 echo "Installing lazyopencode ${VERSION} (${OS}/${ARCH})..."
 
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 
-curl -fsSL -o "$TMP" "$URL"
-chmod +x "$TMP"
+curl -fsSL -o "${TMPDIR}/${ARCHIVE}" "$URL"
+tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
 if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP" "${INSTALL_DIR}/lazyopencode"
+  mv "${TMPDIR}/lazyopencode" "${INSTALL_DIR}/lazyopencode"
 else
-    echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-    sudo mv "$TMP" "${INSTALL_DIR}/lazyopencode"
+  echo "Installing to ${INSTALL_DIR} (requires sudo)..."
+  sudo mv "${TMPDIR}/lazyopencode" "${INSTALL_DIR}/lazyopencode"
 fi
 
 echo "Installed lazyopencode to ${INSTALL_DIR}/lazyopencode"

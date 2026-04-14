@@ -2,7 +2,7 @@ BINARY  := build/lazyopencode
 LINK    := $(HOME)/.local/bin/lazyopencode
 SRC     := $(wildcard *.go)
 
-.PHONY: build link install clean fmt vet lint test cover check release
+.PHONY: build link install clean fmt vet lint test cover check release snapshot release-check
 
 build: $(SRC)
 	@mkdir -p build
@@ -50,3 +50,9 @@ release: check
 		[yY]) git tag $$new && git push origin $$new ;; \
 		*) echo "Aborted." ;; \
 	esac
+
+snapshot:
+	goreleaser release --snapshot --clean
+
+release-check:
+	goreleaser check

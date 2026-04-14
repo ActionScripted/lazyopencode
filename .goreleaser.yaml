@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: lazyopencode
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+release:
+  extra_files:
+    - glob: install.sh
+
+# brews is deprecated in v2.10+ in favour of homebrew_casks, but we keep it
+# to preserve the Formula-based install UX (brew install, not brew install --cask).
+brews:
+  - name: lazyopencode
+    homepage: "https://github.com/actionscripted/lazyopencode"
+    description: "Terminal UI for managing opencode sessions"
+    license: MIT
+    directory: Formula
+    install: |
+      bin.install "lazyopencode"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/lazyopencode --version")
+    commit_msg_template: "chore: update lazyopencode to {{ .Tag }}"
+    commit_author:
+      name: goreleaserbot
+      email: "bot@goreleaser.com"
+    repository:
+      owner: actionscripted
+      name: homebrew-lazyopencode
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
