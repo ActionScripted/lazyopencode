@@ -637,11 +637,25 @@ func TestUpdateStats_EscReturnsNormalMode(t *testing.T) {
 	}
 }
 
-func TestUpdateStats_QReturnsNormalMode(t *testing.T) {
+func TestUpdateStats_QQuitsApp(t *testing.T) {
 	m := newModel("/tmp/fake.db", true)
 	m.mode = modeStats
 
-	result, _ := m.updateStats(keyMsg("q"))
+	result, cmd := m.updateStats(keyMsg("q"))
+	rm := mustModel(t, result)
+	if cmd == nil {
+		t.Error("expected a non-nil cmd (tea.Quit) when q is pressed in modeStats")
+	}
+	if rm.mode != modeStats {
+		t.Errorf("mode should stay modeStats, got %v", rm.mode)
+	}
+}
+
+func TestUpdateStats_SReturnsNormalMode(t *testing.T) {
+	m := newModel("/tmp/fake.db", true)
+	m.mode = modeStats
+
+	result, _ := m.updateStats(keyMsg("s"))
 	rm := mustModel(t, result)
 	if rm.mode != modeNormal {
 		t.Errorf("expected modeNormal, got %v", rm.mode)
