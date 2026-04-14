@@ -16,6 +16,7 @@ var version = "dev"
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	demo := flag.Bool("demo", false, "run with fake sessions for screenshots (no DB required)")
+	themeFlag := flag.String("theme", "opencode", "color theme: opencode, tokyonight")
 
 	flag.Usage = func() {
 		w := flag.CommandLine.Output()
@@ -31,6 +32,12 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if p, ok := themes[*themeFlag]; ok {
+		activeThemeName = *themeFlag
+		activePalette = p
+	}
+	initStyles()
 
 	if *showVersion {
 		fmt.Printf("lazyopencode %s\n", version)

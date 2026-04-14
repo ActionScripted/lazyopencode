@@ -97,20 +97,25 @@ type model struct {
 	globalStats            *globalStats  // cached aggregate stats; nil until first load
 	statsScrollOffset      int           // scroll position (in lines) for the stats view
 	pathColW               int           // cached path column width for renderList; recomputed whenever m.filtered changes
+	themeName              string        // name of the active theme
 }
 
 func newModel(dbPath string, demoMode bool) model {
 	ti := textinput.New()
 	ti.Placeholder = "search sessions…"
 	ti.Prompt = ""
+	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
+	ti.TextStyle = lipgloss.NewStyle().Background(colorBgPanel)
+	ti.Cursor.Style = lipgloss.NewStyle().Background(colorBgPanel)
 
 	return model{
-		mode:     modeNormal,
-		keys:     defaultKeyMap(),
-		dbPath:   dbPath,
-		home:     resolveHome(),
-		demoMode: demoMode,
-		search:   ti,
+		mode:      modeNormal,
+		keys:      defaultKeyMap(),
+		dbPath:    dbPath,
+		home:      resolveHome(),
+		demoMode:  demoMode,
+		search:    ti,
+		themeName: activeThemeName,
 	}
 }
 

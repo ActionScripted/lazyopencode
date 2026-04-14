@@ -178,16 +178,17 @@ func (m model) renderList(width, height int) string {
 	if m.mode == modeSearch {
 		prefix = styleSearchPrefix.Render("> ")
 	}
-	sb.WriteString(prefix + m.search.View() + "\n")
+	searchRow := lipgloss.NewStyle().Width(width).Background(colorBgPanel).Render(prefix + m.search.View())
+	sb.WriteString(searchRow + "\n")
 	sb.WriteString(styleSeparator.Render(strings.Repeat("─", width)) + "\n")
 
 	if len(m.filtered) == 0 && len(m.sessions) == 0 {
-		sb.WriteString(styleDim.Render("  no sessions found") + "\n")
+		sb.WriteString(styleDimDark.Render("  no sessions found") + "\n")
 		return sb.String()
 	}
 
 	if len(m.filtered) == 0 {
-		sb.WriteString(styleDim.Render("  no matches") + "\n")
+		sb.WriteString(styleDimDark.Render("  no matches") + "\n")
 		return sb.String()
 	}
 
@@ -247,14 +248,14 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 
 	// title
 	header.WriteString(stylePreviewTitle.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(s.Title),
+		lipgloss.NewStyle().MaxWidth(inner).Background(colorBgPanel).Render(s.Title),
 	))
 	header.WriteString("\n\n")
 
 	// path
 	header.WriteString(metaLabel("path"))
 	header.WriteString(styleAccent.Render(
-		lipgloss.NewStyle().MaxWidth(inner - labelW).Render(s.DisplayDirectory()),
+		lipgloss.NewStyle().MaxWidth(inner - labelW).Background(colorBgPanel).Render(s.DisplayDirectory()),
 	))
 	header.WriteString("\n")
 
@@ -268,11 +269,11 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 		// models
 		if len(st.Models) > 0 {
 			header.WriteString(metaLabel("model"))
-			header.WriteString(st.Models[0])
+			header.WriteString(styleSpBgPanel.Render(st.Models[0]))
 			header.WriteString("\n")
 			for _, mdl := range st.Models[1:] {
-				header.WriteString(strings.Repeat(" ", labelW))
-				header.WriteString(mdl)
+				header.WriteString(styleSpBgPanel.Render(strings.Repeat(" ", labelW)))
+				header.WriteString(styleSpBgPanel.Render(mdl))
 				header.WriteString("\n")
 			}
 			header.WriteString("\n")
@@ -288,25 +289,25 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 			}
 		}
 		header.WriteString(metaLabel("messages"))
-		fmt.Fprintf(&header, "%d", msgCount)
+		header.WriteString(styleSpBgPanel.Render(fmt.Sprintf("%d", msgCount)))
 		header.WriteString("\n")
 
 		header.WriteString(metaLabel("prompts"))
-		fmt.Fprintf(&header, "%d", promptCount)
+		header.WriteString(styleSpBgPanel.Render(fmt.Sprintf("%d", promptCount)))
 		header.WriteString("\n")
 
 		// context + tokens (only when AI turns exist)
 		if st.ContextTokens > 0 {
 			header.WriteString(metaLabel("context"))
-			header.WriteString(formatTokens(st.ContextTokens))
+			header.WriteString(styleSpBgPanel.Render(formatTokens(st.ContextTokens)))
 			header.WriteString("\n")
 
 			header.WriteString(metaLabel("tokens"))
-			fmt.Fprintf(&header, "%s in / %s out", formatTokens(st.InputTokens), formatTokens(st.OutputTokens))
+			header.WriteString(styleSpBgPanel.Render(fmt.Sprintf("%s in / %s out", formatTokens(st.InputTokens), formatTokens(st.OutputTokens))))
 			header.WriteString("\n")
 
 			header.WriteString(metaLabel("cost"))
-			header.WriteString(formatCost(st.Cost))
+			header.WriteString(styleSpBgPanel.Render(formatCost(st.Cost)))
 			header.WriteString("\n")
 		}
 	}
@@ -315,17 +316,17 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 
 	// created
 	header.WriteString(metaLabel("created"))
-	header.WriteString(s.CreatedAt.Format("2006-01-02 15:04"))
+	header.WriteString(styleSpBgPanel.Render(s.CreatedAt.Format("2006-01-02 15:04")))
 	header.WriteString("\n")
 
 	// updated
 	header.WriteString(metaLabel("updated"))
-	header.WriteString(s.UpdatedAt.Format("2006-01-02 15:04"))
+	header.WriteString(styleSpBgPanel.Render(s.UpdatedAt.Format("2006-01-02 15:04")))
 	header.WriteString("\n")
 
 	// duration
 	header.WriteString(metaLabel("duration"))
-	header.WriteString(formatDuration(s.UpdatedAt.Sub(s.CreatedAt)))
+	header.WriteString(styleSpBgPanel.Render(formatDuration(s.UpdatedAt.Sub(s.CreatedAt))))
 	header.WriteString("\n")
 
 	header.WriteString("\n")
@@ -333,11 +334,11 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 	// changes
 	header.WriteString(metaLabel("changes"))
 	if s.SummaryFiles > 0 {
-		fmt.Fprintf(&header, "%d files (", s.SummaryFiles)
+		header.WriteString(styleSpBgPanel.Render(fmt.Sprintf("%d files (", s.SummaryFiles)))
 		header.WriteString(styleAdd.Render(fmt.Sprintf("+%d", s.SummaryAdditions)))
-		header.WriteString(" ")
+		header.WriteString(styleSpBgPanel.Render(" "))
 		header.WriteString(styleDel.Render(fmt.Sprintf("-%d", s.SummaryDeletions)))
-		header.WriteString(")")
+		header.WriteString(styleSpBgPanel.Render(")"))
 	} else {
 		header.WriteString(styleDim.Render("none"))
 	}
@@ -358,15 +359,16 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 	var msgSection string
 	switch {
 	case m.messages == nil:
-		msgSection = "\n" + styleDim.Render("  loading…")
+		msgSection = styleSpBgPanel.Render("\n") + styleDim.Render("  loading…")
 
 	case len(m.messages) == 0:
-		msgSection = "\n" + styleDim.Render("  no messages")
+		msgSection = styleSpBgPanel.Render("\n") + styleDim.Render("  no messages")
 
 	default:
-		// Reserve 1 line for the "showing last N messages" indicator —
-		// it is always shown when we truncate, so deduct it upfront.
-		walkHeight := msgHeight - 1
+		// Reserve 1 line for the "showing last N messages" indicator plus
+		// 1 safety line — wrap-cost approximation occasionally undercounts
+		// and lets a message spill past the bottom of the pane.
+		walkHeight := msgHeight - 2
 
 		// Determine which messages are visible without rendering all of them.
 		// Walk backwards from the last message, accumulating line cost, until
@@ -413,6 +415,7 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 				Width(inner).
 				Align(lipgloss.Center).
 				Italic(true).
+				Background(colorBgPanel).
 				Foreground(colorDim).
 				Render(fmt.Sprintf("showing last %d messages", n))
 			sb.WriteString(indicator)
@@ -459,10 +462,10 @@ func (m model) renderPreview(width, height int, stacked bool) string {
 				text = strings.Join(displayLines, "\n")
 			}
 
-			wrapped := lipgloss.NewStyle().Width(inner).Render(text)
-			sb.WriteString("\n")
-			sb.WriteString(label + "\n" + wrapped)
-			sb.WriteString("\n")
+			wrapped := lipgloss.NewStyle().Width(inner).Background(colorBgPanel).Render(text)
+			sb.WriteString(styleSpBgPanel.Render("\n"))
+			sb.WriteString(label + styleSpBgPanel.Render("\n") + wrapped)
+			sb.WriteString(styleSpBgPanel.Render("\n"))
 		}
 		msgSection = sb.String()
 	}
@@ -497,18 +500,18 @@ func (m model) renderHint(width int) string {
 		case modeGoto:
 			hints = "  s: shell   w: workspace   esc: cancel"
 		case modeStats:
-			hints = "  j/k: scroll   r: refresh   esc: back"
+			hints = "  j/k: scroll   r: refresh   s: stats   q: quit"
 		case modeError:
 			hints = "  q: quit"
 		default:
-			hints = "  j/k: up/down   enter: open   /: search   s: stats   y: yank   g: goto   d: del   w: workspace   q: quit"
+			hints = "  j/k: up/down   enter: open   /: search   s: stats   y: yank   g: goto   d: del   w: workspace   t: theme   q: quit"
 		}
 	}
-	dots := "  " +
+	dots := styleDim.Render("  ") +
 		styleDotBlue.Render("•") +
-		" " +
+		styleDim.Render(" ") +
 		styleDotCyan.Render("•") +
-		" " +
+		styleDim.Render(" ") +
 		styleDotYellow.Render("•")
 
 	var badge string
@@ -544,7 +547,7 @@ func (m model) renderHint(width int) string {
 		if space < 1 {
 			space = 1
 		}
-		logoLine := styleHintBottom.Foreground(colorDim).Width(width).Render(logo + strings.Repeat(" ", space) + badge)
+		logoLine := styleHintBottom.Foreground(colorDim).Width(width).Render(logo + styleDim.Render(strings.Repeat(" ", space)) + badge)
 		return hintLine + "\n" + logoLine
 	}
 
@@ -554,7 +557,7 @@ func (m model) renderHint(width int) string {
 		space = 1
 	}
 
-	return styleHint.Width(width).Render(left + strings.Repeat(" ", space) + badge)
+	return styleHint.Width(width).Render(left + styleDim.Render(strings.Repeat(" ", space)) + badge)
 }
 
 // formatSessionRow renders a single session as a fixed-layout row.
@@ -739,10 +742,10 @@ func (m model) renderGotoModal() string {
 	sKey := styleModalKeyGoto.Render("s")
 	wKey := styleModalKeyGoto.Render("w")
 
-	content := styleModalGotoTitle.Render("Go to…") + "\n\n" +
-		sKey + "  open shell" + "\n" +
-		styleDim.Render("     type 'exit' to return to lazyopencode") + "\n" +
-		wKey + "  workspace view"
+	content := styleModalGotoTitle.Render("Go to…") + styleSpBgPanel.Render("\n\n") +
+		sKey + styleSpBgPanel.Render("  open shell") + styleSpBgPanel.Render("\n") +
+		styleDim.Render("     type 'exit' to return to lazyopencode") + styleSpBgPanel.Render("\n") +
+		wKey + styleSpBgPanel.Render("  workspace view")
 
 	return styleModalGoto.Render(content)
 }
@@ -752,9 +755,9 @@ func (m model) renderYankModal() string {
 	dKey := styleModalKeyYank.Render("d")
 	sKey := styleModalKeyYank.Render("s")
 
-	content := styleModalYankTitle.Render("Yank to clipboard") + "\n\n" +
-		dKey + "  directory" + "\n" +
-		sKey + "  session id"
+	content := styleModalYankTitle.Render("Yank to clipboard") + styleSpBgPanel.Render("\n\n") +
+		dKey + styleSpBgPanel.Render("  directory") + styleSpBgPanel.Render("\n") +
+		sKey + styleSpBgPanel.Render("  session id")
 
 	return styleModalYank.Render(content)
 }
@@ -769,11 +772,11 @@ func (m model) renderSessionModal() string {
 		}
 	}
 
-	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
+	confirm := styleModalKey.Render("Yes [y/d]") + styleSpBgPanel.Render("   ") +
 		styleModalKeyCancel.Render("No [n]")
 
-	content := styleModalTitle.Render("Delete session?") + "\n\n" +
-		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerWidth)) + "\n\n" +
+	content := styleModalTitle.Render("Delete session?") + styleSpBgPanel.Render("\n\n") +
+		stylePreviewTitle.Render(truncate(sessionTitle, modalInnerWidth)) + styleSpBgPanel.Render("\n\n") +
 		confirm
 
 	return styleModal.Render(content)
@@ -785,9 +788,9 @@ func (m model) renderErrorModal() string {
 	qKey := styleModalKey.Render("q")
 
 	msg := m.err.Error()
-	content := styleModalTitle.Render("Fatal Error") + "\n\n" +
-		styleDim.Render(truncate(msg, modalInnerWidth)) + "\n\n" +
-		qKey + "  quit"
+	content := styleModalTitle.Render("Fatal Error") + styleSpBgPanel.Render("\n\n") +
+		styleDim.Render(truncate(msg, modalInnerWidth)) + styleSpBgPanel.Render("\n\n") +
+		qKey + styleSpBgPanel.Render("  quit")
 
 	return styleModal.Render(content)
 }
@@ -808,7 +811,7 @@ func (m model) renderWorkspaceModal() string {
 	countLine := stylePreviewTitle.Render(fmt.Sprintf("%d", count)) +
 		styleDim.Render(" "+noun+" will be deleted")
 
-	confirm := styleModalKey.Render("Yes [y/d]") + "   " +
+	confirm := styleModalKey.Render("Yes [y/d]") + styleSpBgPanel.Render("   ") +
 		styleModalKeyCancel.Render("No [n]")
 
 	// Use pre-computed DisplayDir from the workspace to avoid calling
@@ -821,9 +824,9 @@ func (m model) renderWorkspaceModal() string {
 		}
 	}
 
-	content := styleModalTitle.Render("Delete workspace?") + "\n\n" +
-		stylePreviewTitle.Render(truncate(displayPath, modalInnerWidth)) + "\n" +
-		countLine + "\n\n" +
+	content := styleModalTitle.Render("Delete workspace?") + styleSpBgPanel.Render("\n\n") +
+		stylePreviewTitle.Render(truncate(displayPath, modalInnerWidth)) + styleSpBgPanel.Render("\n") +
+		countLine + styleSpBgPanel.Render("\n\n") +
 		confirm
 
 	return styleModal.Render(content)

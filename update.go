@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // clamp constrains v to [lo, hi].
@@ -91,6 +92,23 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadGlobalStatsCmd()
 		}
 		return m, nil
+
+	case key.Matches(msg, m.keys.Theme):
+		// Cycle to the next theme in themeOrder.
+		idx := 0
+		for i, name := range themeOrder {
+			if name == m.themeName {
+				idx = i
+				break
+			}
+		}
+		next := themeOrder[(idx+1)%len(themeOrder)]
+		activeThemeName = next
+		activePalette = themes[next]
+		initStyles()
+		m.themeName = next
+		m.search.PlaceholderStyle = lipgloss.NewStyle().Foreground(colorDim).Background(colorBgPanel)
+		return m, nil
 	}
 
 	return m, nil
@@ -100,7 +118,10 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // esc/q returns to modeNormal; j/k scroll the stats body.
 func (m model) updateStats(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Back), key.Matches(msg, m.keys.Quit):
+	case key.Matches(msg, m.keys.Quit):
+		return m, tea.Quit
+
+	case key.Matches(msg, m.keys.Stats), key.Matches(msg, m.keys.Back):
 		m.mode = modeNormal
 		return m, nil
 

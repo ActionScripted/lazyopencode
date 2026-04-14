@@ -25,8 +25,8 @@ const (
 	statsCompactBreakpoint = 100 // terminal width that triggers compact layout
 	tblSessWC              = 5   // compact sessions column (normal: 8)
 	tblPrmtWC              = 5   // compact prompts column (normal: 8)
-	tblTokW                = 12  // merged "in/out" column replacing tblInW+tblOutW; header uses ↑/↓
-	tblTimeWC              = 4   // compact time column (normal: 8)
+	tblTokW                = 7   // compact merged tokens column (in+out total, e.g. "123.4M")
+	tblTimeWC              = 6   // compact time column (normal: 8) — fits "1h 38m"
 	tblGapC                = 2   // compact gap between columns (normal: 3)
 
 	// Cost column — same width in both normal and compact layouts.
@@ -76,7 +76,7 @@ func (m model) renderStats(w, h int) string {
 	pad := strings.Repeat(" ", indent)
 
 	if m.globalStats == nil {
-		return pad + styleDimPanel.Render("loading stats…")
+		return styleSpPanel.Render(pad) + styleDimPanel.Render("loading stats…")
 	}
 
 	gs := m.globalStats
@@ -86,10 +86,25 @@ func (m model) renderStats(w, h int) string {
 
 	// ── KV summary fieldsets ───────────────────────────────────────────────────
 
-	// avail is the usable content width (inside the 2-space left indent).
-	avail := w - indent
+	// avail is the usable content width (inside the 2-space left+right indent).
+	avail := w - indent*2
 	if avail < 1 {
 		avail = 1
+	}
+	// Wide mode halves avail between two fieldsets. Round avail down so
+	// (avail - fieldsetGap) is even — otherwise a stray column leaks and
+	// the gap jumps on resize. Compact mode uses avail directly, so skip
+	// the rounding there (it would just steal a col from the right margin).
+	if !compact && (avail-2)%2 != 0 {
+		avail--
+	}
+
+	// Inner horizontal padding inside fieldset borders and around the
+	// outermost table columns. Compact mode tightens this so narrow
+	// terminals don't waste columns on empty margins.
+	padX := fieldsetPadX
+	if compact {
+		padX = 1
 	}
 
 	if compact {
@@ -99,7 +114,7 @@ func (m model) renderStats(w, h int) string {
 		if outerW < 20 {
 			outerW = 20
 		}
-		innerW := outerW - 2 - fieldsetPadX*2
+		innerW := outerW - 2 - padX*2
 		if innerW < 10 {
 			innerW = 10
 		}
@@ -123,12 +138,12 @@ func (m model) renderStats(w, h int) string {
 			innerW: innerW,
 		}, compact)
 
-		for _, line := range strings.Split(renderFieldset("ALL TIME", allTimeKV, outerW, innerW), "\n") {
-			sb.WriteString(pad + line + "\n")
+		for _, line := range strings.Split(renderFieldset("ALL TIME", allTimeKV, outerW, innerW, padX), "\n") {
+			sb.WriteString(styleSpPanel.Render(pad) + line + "\n")
 		}
-		sb.WriteString("\n")
-		for _, line := range strings.Split(renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW), "\n") {
-			sb.WriteString(pad + line + "\n")
+		sb.WriteString(styleSpPanel.Render("\n"))
+		for _, line := range strings.Split(renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW, padX), "\n") {
+			sb.WriteString(styleSpPanel.Render(pad) + line + "\n")
 		}
 	} else {
 		// Wide: side-by-side fieldsets.
@@ -138,7 +153,7 @@ func (m model) renderStats(w, h int) string {
 			outerW = 20
 		}
 		// Inner text width: outer minus left+right borders (1 each) minus padding (fieldsetPadX each side).
-		innerW := outerW - 2 - fieldsetPadX*2
+		innerW := outerW - 2 - padX*2
 		if innerW < 10 {
 			innerW = 10
 		}
@@ -162,11 +177,19 @@ func (m model) renderStats(w, h int) string {
 			innerW: innerW,
 		}, compact)
 
-		left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW)
-		right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW)
-		row := lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", fieldsetGap), right)
-		for _, line := range strings.Split(row, "\n") {
-			sb.WriteString(pad + line + "\n")
+		left := renderFieldset("ALL TIME", allTimeKV, outerW, innerW, padX)
+		right := renderFieldset("LAST 7 DAYS", recentKV, outerW, innerW, padX)
+		leftLines := strings.Split(left, "\n")
+		rightLines := strings.Split(right, "\n")
+		gapStr := styleSpPanel.Render(strings.Repeat(" ", fieldsetGap))
+		for len(leftLines) < len(rightLines) {
+			leftLines = append(leftLines, "")
+		}
+		for len(rightLines) < len(leftLines) {
+			rightLines = append(rightLines, "")
+		}
+		for i := range leftLines {
+			sb.WriteString(styleSpPanel.Render(pad) + leftLines[i] + gapStr + rightLines[i] + "\n")
 		}
 	}
 
@@ -174,39 +197,45 @@ func (m model) renderStats(w, h int) string {
 	// and data rows; +1 for the trailing space after the rightmost column.
 	var fixedW int
 	if compact {
-		fixedW = tblGapC + tblSessWC + tblGapC + tblPrmtWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostW + tblNameIndent + 1
+		fixedW = tblGapC + tblSessWC + tblGapC + tblPrmtWC + tblGapC + tblTokW + tblGapC + tblTimeWC + tblGapC + tblCostW + 1
 	} else {
-		fixedW = tblGap + tblSessW + tblGap + tblPrmtW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + tblNameIndent + 1
+		fixedW = tblGap + tblSessW + tblGap + tblPrmtW + tblGap + tblInW + tblGap + tblOutW + tblGap + tblTimeW + tblGap + tblCostW + 3
 	}
+
+	// Tables get an extra 2-space left indent (tblPad) so they visually align
+	// with the fieldset content above. tblAvail shrinks by the same amount so
+	// the right margin stays symmetric.
+	tblPad := pad
+	tblAvail := avail
 
 	// ── Models table ──────────────────────────────────────────────────────────
 	if len(gs.Models) > 0 {
 		sb.WriteString("\n")
-		sb.WriteString(renderSectionRule("MODELS", pad, avail))
+		sb.WriteString(renderSectionRule("MODELS", tblPad, tblAvail))
 
-		nameW := avail - fixedW
+		nameW := tblAvail - fixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildModelRows(gs.Models)
-		sb.WriteString(renderTableHeader(pad, nameW, compact))
-		sb.WriteString(renderTableRule(pad, avail))
-		sb.WriteString(renderModelRows(rows, pad, nameW, compact))
+		sb.WriteString(renderTableHeader(tblPad, nameW, compact))
+		sb.WriteString(renderTableRule(tblPad, tblAvail))
+		sb.WriteString(renderModelRows(rows, tblPad, nameW, compact))
 	}
 
 	// ── Projects table ────────────────────────────────────────────────────────
 	if len(gs.Projects) > 0 {
 		sb.WriteString("\n")
-		sb.WriteString(renderSectionRule("PROJECTS", pad, avail))
+		sb.WriteString(renderSectionRule("PROJECTS", tblPad, tblAvail))
 
-		nameW := avail - fixedW
+		nameW := tblAvail - fixedW
 		if nameW < nameColMin {
 			nameW = nameColMin
 		}
 		rows := buildProjectRows(gs.Projects)
-		sb.WriteString(renderTableHeader(pad, nameW, compact))
-		sb.WriteString(renderTableRule(pad, avail))
-		sb.WriteString(renderProjectRows(rows, pad, nameW, compact))
+		sb.WriteString(renderTableHeader(tblPad, nameW, compact))
+		sb.WriteString(renderTableRule(tblPad, tblAvail))
+		sb.WriteString(renderProjectRows(rows, tblPad, nameW, compact))
 	}
 
 	// Window the full content to bodyH lines at the current scroll offset.
@@ -256,12 +285,12 @@ func renderSectionRule(title, pad string, avail int) string {
 	line := styleDimPanel.Render(prefix) +
 		styleStatsTitlePanel.Render(title) +
 		styleDimPanel.Render(suffix+strings.Repeat("─", remaining))
-	return pad + line + "\n"
+	return styleSpPanel.Render(pad) + line + "\n"
 }
 
 // renderTableRule renders a dim separator rule: pad + ─×w.
 func renderTableRule(pad string, w int) string {
-	return pad + styleDimPanel.Render(strings.Repeat("─", w)) + "\n"
+	return styleSpPanel.Render(pad) + styleDimPanel.Render(strings.Repeat("─", w)) + "\n"
 }
 
 // ── Fieldset ──────────────────────────────────────────────────────────────────
@@ -275,8 +304,8 @@ func renderTableRule(pad string, w int) string {
 //
 // outerW is the total column width of the box; innerW is the text content width.
 // Uses *Panel style variants throughout so the panel background carries through.
-func renderFieldset(title, content string, outerW, innerW int) string {
-	padStr := strings.Repeat(" ", fieldsetPadX)
+func renderFieldset(title, content string, outerW, innerW, padX int) string {
+	padStr := strings.Repeat(" ", padX)
 	borderW := outerW - 2 // dashes between the two corner characters
 
 	// ── top border with title ──────────────────────────────────────────────
@@ -373,25 +402,25 @@ func buildSummaryKV(d summaryData, compact bool) string {
 
 	if compact {
 		rows = append(rows,
-			kv("tokens in/out", formatTokens(d.input)+" / "+formatTokens(d.output)),
-			kv("cache r/w", formatTokens(d.cacheRead)+" / "+formatTokens(d.cacheWrite)),
+			kv("tokens in/out", styleSpPanel.Render(formatTokens(d.input)+" / "+formatTokens(d.output))),
+			kv("cache r/w", styleSpPanel.Render(formatTokens(d.cacheRead)+" / "+formatTokens(d.cacheWrite))),
 		)
 	} else {
 		rows = append(rows,
-			kv("tokens in", formatTokens(d.input)),
-			kv("tokens out", formatTokens(d.output)),
-			kv("cache read", formatTokens(d.cacheRead)),
-			kv("cache write", formatTokens(d.cacheWrite)),
+			kv("tokens in", styleSpPanel.Render(formatTokens(d.input))),
+			kv("tokens out", styleSpPanel.Render(formatTokens(d.output))),
+			kv("cache read", styleSpPanel.Render(formatTokens(d.cacheRead))),
+			kv("cache write", styleSpPanel.Render(formatTokens(d.cacheWrite))),
 		)
 	}
 
 	rows = append(rows,
 		blank,
-		kv("total time", formatDurationMS(d.durationMS)),
-		kv("avg time", perSession),
-		kv("cost", formatCost(d.cost)),
+		kv("total time", styleSpPanel.Render(formatDurationMS(d.durationMS))),
+		kv("avg time", styleSpPanel.Render(perSession)),
+		kv("cost", styleSpPanel.Render(formatCost(d.cost))),
 		blank,
-		kv("files", formatCommas(d.files)),
+		kv("files", styleSpPanel.Render(formatCommas(d.files))),
 		kv("changes", changes),
 	)
 	return strings.Join(rows, "\n")
@@ -459,12 +488,12 @@ func renderTableHeader(pad string, nameW int, compact bool) string {
 		g = strings.Repeat(" ", tblGapC)
 	}
 	var sb strings.Builder
-	sb.WriteString(pad)
+	sb.WriteString(styleSpPanel.Render(pad))
 	sb.WriteString(styleSpPanel.Render(padRight("", nameW)))
 	if compact {
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblSessWC, "sess")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblPrmtWC, "prmt")))
-		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens ↑/↓")))
+		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTokW, "tokens")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblTimeWC, "time")))
 		sb.WriteString(hdr.Render(g + fmt.Sprintf("%*s", tblCostW, "cost")))
 	} else {
@@ -484,7 +513,7 @@ func renderTableHeader(pad string, nameW int, compact bool) string {
 // provided style for each cell. It handles both compact and normal layouts.
 func renderTableCols(sb *strings.Builder, r statsTableRow, g string, compact bool, sp, count lipgloss.Style) {
 	if compact {
-		tok := formatTokensMerged(r.inputTokens, r.outTokens)
+		tok := formatTokens(r.inputTokens + r.outTokens)
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblSessWC, r.sessions)))
 		sb.WriteString(count.Render(g + fmt.Sprintf("%*d", tblPrmtWC, r.prompts)))
 		sb.WriteString(sp.Render(g + fmt.Sprintf("%*s", tblTokW, tok)))
@@ -504,19 +533,24 @@ func renderTableCols(sb *strings.Builder, r statsTableRow, g string, compact boo
 func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
+	indent := tblNameIndent
+	trailing := 3
 	if compact {
 		g = strings.Repeat(" ", tblGapC)
+		indent = 1
+		trailing = 1
 	}
+	indentStr := strings.Repeat(" ", indent)
 	for i, r := range rows {
 		sp, label, count := styleSpPanel, styleStatsLabelPanel, styleStatsCountPanel
 		if i%2 != 0 {
 			sp, label, count = styleSpPanelAlt, styleStatsLabelPanelAlt, styleStatsCountPanelAlt
 		}
-		name := "   " + truncate(r.name, nameW-tblNameIndent)
-		sb.WriteString(pad)
+		name := indentStr + truncate(r.name, nameW-indent)
+		sb.WriteString(styleSpPanel.Render(pad))
 		sb.WriteString(label.Render(padRight(name, nameW)))
 		renderTableCols(&sb, r, g, compact, sp, count)
-		sb.WriteString(sp.Render(strings.Repeat(" ", 1+tblNameIndent)))
+		sb.WriteString(sp.Render(strings.Repeat(" ", trailing)))
 		sb.WriteString("\n")
 	}
 	return sb.String()
@@ -527,29 +561,35 @@ func renderModelRows(rows []statsTableRow, pad string, nameW int, compact bool) 
 func renderProjectRows(rows []statsTableRow, pad string, nameW int, compact bool) string {
 	var sb strings.Builder
 	g := strings.Repeat(" ", tblGap)
+	indent := tblNameIndent
+	trailing := 3
 	if compact {
 		g = strings.Repeat(" ", tblGapC)
+		indent = 1
+		trailing = 1
 	}
+	indentStr := strings.Repeat(" ", indent)
+	subIndentStr := strings.Repeat(" ", indent+2)
 	for _, r := range rows {
 		// In compact mode show only the last path component (e.g. "myapp" not "~/code/myapp").
 		displayName := r.name
 		if compact {
 			displayName = filepath.Base(r.name)
 		}
-		name := "   " + truncate(displayName, nameW-tblNameIndent)
-		sb.WriteString(pad)
+		name := indentStr + truncate(displayName, nameW-indent)
+		sb.WriteString(styleSpPanel.Render(pad))
 		sb.WriteString(styleStatsLabelPanel.Render(padRight(name, nameW)))
 		renderTableCols(&sb, r, g, compact, styleSpPanel, styleStatsCountPanel)
-		sb.WriteString(styleSpPanel.Render(strings.Repeat(" ", 1+tblNameIndent)))
+		sb.WriteString(styleSpPanel.Render(strings.Repeat(" ", trailing)))
 		sb.WriteString("\n")
 
 		// Per-model sub-rows: alt background, extra indent.
 		for _, sr := range r.subRows {
-			subName := "     " + truncate(sr.name, nameW-tblNameIndent-2)
-			sb.WriteString(pad)
+			subName := subIndentStr + truncate(sr.name, nameW-indent-2)
+			sb.WriteString(styleSpPanel.Render(pad))
 			sb.WriteString(styleDimPanelAlt.Render(padRight(subName, nameW)))
 			renderTableCols(&sb, sr, g, compact, styleDimPanelAlt, styleDimPanelAlt)
-			sb.WriteString(styleSpPanelAlt.Render(strings.Repeat(" ", 1+tblNameIndent)))
+			sb.WriteString(styleSpPanelAlt.Render(strings.Repeat(" ", trailing)))
 			sb.WriteString("\n")
 		}
 	}

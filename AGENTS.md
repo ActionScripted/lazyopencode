@@ -25,7 +25,8 @@ lazyopencode is a terminal UI (TUI) for managing [opencode](https://opencode.ai)
 | `session.go` | `Session`, `Message`, `SessionStats`, `ModelStat`, `ProjectStat`, `GlobalStats` types; `homeToTilde`, `baseName` helpers; `filterSessions`, `buildWorkspaces`, `removeSessionByID` |
 | `db.go` | SQLite queries — `openReadOnlyDB`, `loadSessions`, `loadMessages`, `loadStats`, `loadGlobalStats`; populates `Session.DisplayDir` and `Session.ShortDir` at load time |
 | `demo.go` | `demoSessions`, `demoMessages`, `demoStats`, `demoGlobalStats`, `demoFeaturedMessages` — hardcoded fake data for `--demo` mode |
-| `styles.go` | Lip Gloss color vars, style definitions, and panel-background style variants; all package-level `var`s |
+| `styles.go` | Lip Gloss color vars (zero-initialized) and style definitions; `initStyles()` populates everything from `activePalette`; all package-level `var`s |
+| `theme.go` | `themePalette` struct, `paletteOpencode`, `paletteTokyonight`, `themes` map, `themeOrder`, `activeThemeName`, `activePalette` — all theme palette data |
 | `Makefile` | `build`, `install`, `fmt`, `vet`, `lint`, `test`, `check`, `release`, `snapshot`, `release-check` targets |
 | `install.sh` | Shell installer; detects OS/arch, downloads and extracts the `.tar.gz` archive from GitHub Releases, installs to `/usr/local/bin` |
 | `.goreleaser.yaml` | GoReleaser config — cross-compilation, `.tar.gz` archives, checksums, Homebrew tap update, `install.sh` as release extra file |
@@ -69,6 +70,7 @@ Session deletion shells out to `opencode session delete <id>` rather than writin
 | Add a workspace render function | `view_workspaces.go` only |
 | Add a stats render function | `view_stats.go` only |
 | Add or edit demo/fake data | `demo.go` only |
+| Add or change a theme palette | `theme.go` only |
 | Change lint rules | `.golangci.yml` only |
 | Change editor conventions | `.editorconfig` only |
 

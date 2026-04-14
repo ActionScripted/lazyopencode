@@ -40,7 +40,7 @@ func (m model) renderWorkspaceList(width, height int) string {
 	height-- // consumed by separator
 
 	if len(m.workspaces) == 0 {
-		sb.WriteString(styleDim.Render("  no workspaces") + "\n")
+		sb.WriteString(styleDimDark.Render("  no workspaces") + "\n")
 		return sb.String()
 	}
 
@@ -108,11 +108,11 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 	// ── header ────────────────────────────────────────────────────────────────
 	var header strings.Builder
 	header.WriteString(stylePreviewTitle.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(selectedWS.DisplayDir),
+		lipgloss.NewStyle().MaxWidth(inner).Background(colorBgPanel).Render(selectedWS.DisplayDir),
 	))
 	header.WriteString("\n")
 	header.WriteString(styleDim.Render(
-		lipgloss.NewStyle().MaxWidth(inner).Render(
+		lipgloss.NewStyle().MaxWidth(inner).Background(colorBgPanel).Render(
 			strings.Repeat("─", max(0, inner)),
 		),
 	))
@@ -128,13 +128,13 @@ func (m model) renderWorkspaceSessions(width, height int) string {
 	// ── session rows ──────────────────────────────────────────────────────────
 	var sessionRows strings.Builder
 	if len(wsSessions) == 0 {
-		sessionRows.WriteString("\n" + styleDim.Render("  no sessions"))
+		sessionRows.WriteString(styleSpBgPanel.Render("\n") + styleDim.Render("  no sessions"))
 	} else {
 		for i, s := range wsSessions {
 			if i >= listHeight {
 				break
 			}
-			sessionRows.WriteString("\n" + formatWorkspaceSessionRow(s, inner))
+			sessionRows.WriteString(styleSpBgPanel.Render("\n") + formatWorkspaceSessionRow(s, inner))
 		}
 	}
 
@@ -155,5 +155,5 @@ func formatWorkspaceSessionRow(s session, width int) string {
 	date := styleDim.Render(s.UpdatedAt.Format("2006-01-02 15:04"))
 	title := styleWorkspaceSessionTitle.Render(truncate(s.Title, titleW))
 
-	return date + strings.Repeat(" ", dateGap) + title
+	return date + styleDim.Render(strings.Repeat(" ", dateGap)) + title
 }

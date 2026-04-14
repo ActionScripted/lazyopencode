@@ -67,6 +67,7 @@ type keyMap struct {
 	GotoWorkspace key.Binding
 	Stats         key.Binding
 	Refresh       key.Binding
+	Theme         key.Binding
 }
 
 // defaultKeyMap returns the default key bindings.
@@ -143,6 +144,10 @@ func defaultKeyMap() keyMap {
 		Refresh: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
+		),
+		Theme: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "theme"),
 		),
 	}
 }
