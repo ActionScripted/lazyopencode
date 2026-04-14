@@ -6,7 +6,7 @@
 
 ## Requirements
 
-Requires [OpenCode](https://opencode.ai) (duh). Supported platforms: `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`.
+Requires [OpenCode](https://opencode.ai). Supported platforms: `darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`.
 
 ## Install
 
@@ -94,8 +94,11 @@ go install golang.org/x/tools/cmd/goimports@latest
 Releases are cut by pushing a semver tag. GoReleaser builds `.tar.gz` archives for all supported platforms, publishes them to GitHub Releases alongside `install.sh` and a `checksums.txt`, and auto-updates the Homebrew tap formula.
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+$ make release
+
+Latest tag: v0.1.2
+New tag [v0.1.3]:
+Tag v0.1.3 — push? [y/N]: y
 ```
 
 ## Contributing
