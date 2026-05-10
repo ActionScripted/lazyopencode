@@ -65,14 +65,35 @@ var paletteOpencode = themePalette{
 	heading:    lipgloss.AdaptiveColor{Light: "#7b5bb6", Dark: "#5c9cf5"}, // opencode secondary — blue dark / violet light
 }
 
+// paletteCatppuccin is the Catppuccin theme — Mocha (dark) / Latte (light).
+var paletteCatppuccin = themePalette{
+	fg:         lipgloss.AdaptiveColor{Light: "#4c4f69", Dark: "#cdd6f4"}, // Latte Text / Mocha Text
+	bright:     lipgloss.AdaptiveColor{Light: "#4c4f69", Dark: "#cdd6f4"},
+	dim:        lipgloss.AdaptiveColor{Light: "#8c8fa1", Dark: "#6c7086"}, // Latte Overlay1 / Mocha Overlay0
+	cyan:       lipgloss.AdaptiveColor{Light: "#179299", Dark: "#89dceb"}, // Latte Teal / Mocha Sky
+	blue:       lipgloss.AdaptiveColor{Light: "#1e66f5", Dark: "#89b4fa"}, // Latte Blue / Mocha Blue
+	onBadge:    lipgloss.AdaptiveColor{Light: "#eff1f5", Dark: "#1e1e2e"}, // Latte Base / Mocha Base
+	bgDark:     lipgloss.AdaptiveColor{Light: "#dce0e8", Dark: "#181825"}, // Latte Mantle / Mocha Mantle
+	bgPanel:    lipgloss.AdaptiveColor{Light: "#e6e9ef", Dark: "#1e1e2e"}, // Latte Base / Mocha Base
+	bgPanelAlt: lipgloss.AdaptiveColor{Light: "#eff1f5", Dark: "#313244"}, // Latte Crust / Mocha Surface0
+	selected:   lipgloss.AdaptiveColor{Light: "#bcc0cc", Dark: "#313244"}, // Latte Overlay0 / Mocha Surface0
+	border:     lipgloss.AdaptiveColor{Light: "#9ca0b0", Dark: "#45475a"}, // Latte Overlay2 / Mocha Surface1
+	yellow:     lipgloss.AdaptiveColor{Light: "#df8e1d", Dark: "#f9e2af"}, // Latte Yellow / Mocha Yellow
+	green:      lipgloss.AdaptiveColor{Light: "#40a02b", Dark: "#a6e3a1"}, // Latte Green / Mocha Green
+	danger:     lipgloss.AdaptiveColor{Light: "#d20f39", Dark: "#f38ba8"}, // Latte Red / Mocha Red
+	purple:     lipgloss.AdaptiveColor{Light: "#8839ef", Dark: "#cba6f7"}, // Latte Mauve / Mocha Mauve
+	heading:    lipgloss.AdaptiveColor{Light: "#7287fd", Dark: "#b4befe"}, // Latte Lavender / Mocha Lavender
+}
+
 // themes maps theme name strings to their palettes.
 var themes = map[string]themePalette{
 	"opencode":   paletteOpencode,
 	"tokyonight": paletteTokyonight,
+	"catppuccin": paletteCatppuccin,
 }
 
 // themeOrder is the stable cycle order for the theme-toggle key ("t").
-var themeOrder = []string{"opencode", "tokyonight"}
+var themeOrder = []string{"opencode", "tokyonight", "catppuccin"}
 
 // activeThemeName is the name of the currently active theme.
 var activeThemeName = "opencode"
